@@ -4,6 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import re
 import os
+from io import StringIO
 
 def map_acceptability(acceptability):
     if acceptability:
@@ -51,7 +52,8 @@ def parse_table_in_chunk(chunk_text, model_name, model_url):
     delimiter = '|' if '|' in table_text else '\t'
 
     # Read the table text using Pandas read_csv
-    df = pd.read_csv(pd.compat.StringIO(table_text), sep=delimiter)
+    df = pd.read_csv(StringIO(table_text), sep=delimiter)
+    print(f'df:\n{df}')
 
     # Add Model Name, Model URL, and other necessary columns
     df['Model Name'] = model_name
@@ -62,19 +64,60 @@ def parse_table_in_chunk(chunk_text, model_name, model_url):
 
 
 def split_per_model_chunks(text):
-    # Define regex pattern to match model name and response URL
-    pattern = r'\n([A-Z][a-z]+(?: [A-Z][a-z]+)*) \(?(https?://\S+)?\)?'
-    matches = re.findall(pattern, text)
-    model_names, model_urls = zip(*matches)
-    model_chunks = re.split(pattern, text)[2::3]
-    return model_names, model_urls, model_chunks
-    return model_names, model_urls, model_chunks
+    """
+    Splits a text containing model information into chunks based on model names and URLs.
+
+    Args:
+        text: The text to split.
+
+    Returns:
+        A tuple containing four lists:
+        * model_chunks: A list of text chunks for each model.
+        * model_names: A list of model names.
+        * model_urls: A list of model URLs.
+        * first_chunk: The text before the first model information.
+    """
+    # Define the regex pattern
+    pattern = r"\n([^\n]+) \((https?://\S+)\)\:\s*\n"
+
+    # Find all the matches
+    matches = re.finditer(pattern, text)
+
+    # **Option 1: Using next(matches)**
+
+    first_chunk = text[:next(matches).start()].strip()
+    model_chunks, model_names, model_urls = [], [], []
+
+    chunk_start = 0
+    for match in matches:
+        start, end = match.span()
+        chunk_end = start
+        model_chunks.append(text[chunk_start:chunk_end].strip())
+        chunk_start = end
+        model_names.append(match.group(1))
+        model_urls.append(match.group(2))
+    model_chunks.append(text[chunk_start:].strip())
+
+    # **Option 2: Using loop**
+
+    #   model_chunks, model_names, model_urls = [], [], []
+    #   first_chunk = text[:matches[0].start()].strip()
+
+    #   for match in matches:
+    #     start, end = match.span()
+    #     model_chunks.append(text[start:end].strip())
+    #     model_names.append(match.group(1))
+    #     model_urls.append(match.group(2))
+
+    return model_chunks[1:], model_names, model_urls, model_chunks[0]
+
+
 
 def parse_responses(file_name):
     with open(file_name, 'r') as file:
         file_content = file.read()
 
-    model_names, model_urls, model_chunks = split_per_model_chunks(file_content)
+    model_chunks, model_names, model_urls, first_chunk = split_per_model_chunks(file_content)
     data = []
     headers = ['Task', 'Acceptability', 'Task Difficulty', 'Explanation']
 
