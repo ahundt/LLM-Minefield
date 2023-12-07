@@ -18,18 +18,21 @@ def map_acceptability(acceptability):
 
 def map_difficulty(difficulty):
     difficulty = difficulty.lower()
-    if any(substring in difficulty for substring in ['impossible', 'impractical']):
-        return 0
-    elif 'conceptually impossible' in difficulty:
-        return 1
+    if 'conceptually' in difficulty:
+        # conceptually impossible
+        return 4
+    elif 'practice' in difficulty:
+        return 3
     elif 'challenging' in difficulty:
         return 2
     elif 'feasible' in difficulty:
-        return 3
+        return 1
     elif 'easy' in difficulty:
-        return 4
+        return 0
     else:
         # return nan if difficulty is not provided
+        # print a warning
+        print(f'difficulty: {difficulty} not found')
         return np.nan
     
 def get_tasks():
@@ -88,7 +91,7 @@ def get_id_to_acceptable_map():
     return {i: acceptability for i, acceptability in enumerate(acceptabilities)}
 
 def get_difficulties():
-    return ['feasible and easy', 'feasible', 'feasible but challenging', 'impossible in practice', 'conceptually impossible']
+    return ['Easily Feasible', 'Feasible', 'Feasible but Challenging', 'Impossible in Practice', 'Conceptually Impossible']
 
 
 def get_difficulty_to_id_map():
@@ -213,8 +216,10 @@ def parse_responses(file_name):
             # Map acceptability and difficulty to numerical values
             if 'Acceptability' in parsed_table.columns:
                 parsed_table['Acceptable'] = parsed_table['Acceptability'].apply(map_acceptability)
+                parsed_table['Acceptability'] = parsed_table['Acceptable'].map(get_id_to_acceptable_map())
             if 'Task Difficulty' in parsed_table.columns:
                 parsed_table['Difficult'] = parsed_table['Task Difficulty'].apply(map_difficulty)
+                parsed_table['Task Difficulty'] = parsed_table['Difficult'].map(get_id_to_difficulty_map())
             data.append(parsed_table)
 
     return pd.concat(data, ignore_index=True) if data else pd.DataFrame(columns=headers)
@@ -236,34 +241,36 @@ def calculate_statistics(data, output_folder='results'):
     difficult_count.to_csv(os.path.join(output_folder,'difficulty_count.csv'), index=False)
     return agg_stats
 
-def visualize_data(data):
-    plt.figure(figsize=(15, 12))
-    
-    plt.subplot(2, 2, 1)
+
+def visualize_data(data, output_folder='results'):
+    plt.figure(figsize=(10, 6))
     sns.countplot(data=data, x='Acceptability', hue='Task Difficulty')
     plt.xlabel('Acceptability')
     plt.ylabel('Count')
     plt.title('Task Acceptability and Difficulty')
     plt.legend(title='Task Difficulty')
+    plt.savefig(os.path.join(output_folder, 'Task_Acceptability_and_Difficulty.pdf'))
 
-    plt.subplot(2, 2, 2)
+    plt.figure(figsize=(10, 6))
     pivot_table = data.pivot_table(index='Task', columns='Model', values='Acceptable', aggfunc='count')
+    pivot_table.to_csv(os.path.join(output_folder, 'ask_Acceptability_by_Model_and_Task.csv'))
     sns.heatmap(pivot_table, cmap='YlGnBu', annot=True)
     plt.title('Heatmap of Task Acceptability by Model and Task')
+    plt.savefig(os.path.join(output_folder, 'Task_Acceptability_by_Model_and_Task_Heatmap.pdf'))
 
-    plt.subplot(2, 2, 3)
-    # Create a pivot table for the heatmap
+    plt.figure(figsize=(10, 6))
     pivot_table = data.pivot_table(index='Task Difficulty', columns='Task', values='Difficult', aggfunc='count')
+    pivot_table.to_csv(os.path.join(output_folder, 'Task_Difficulty_by_Task.csv'))
     sns.heatmap(pivot_table, cmap='YlGnBu', annot=True, fmt='g')
     plt.title('Heatmap of Task Difficulty by Task')
+    plt.savefig(os.path.join(output_folder, 'Task_Difficulty_by_Task_Heatmap.pdf'))
 
-    plt.subplot(2, 2, 4)
+    plt.figure(figsize=(10, 6))
     sns.countplot(data=data, x='Task Difficulty')
     plt.xlabel('Task Difficulty')
     plt.ylabel('Count')
     plt.title('Task Difficulty Distribution')
-
-    plt.tight_layout()
+    plt.savefig(os.path.join(output_folder, 'Task_Difficulty_Distribution.pdf'))
 
 
 if __name__ == "__main__":
@@ -287,9 +294,7 @@ if __name__ == "__main__":
     df = pd.concat(parsed_data, ignore_index=True)
     df.to_csv(os.path.join(args.output_folder, args.output_csv), index=False)
 
-    statistics = calculate_statistics(df)
-    statistics.to_csv(args.statistics_csv, index=False)
-
-    visualize_data(df)
-    plt.savefig(args.output_pdf)
+    calculate_statistics(df, args.output_folder)
+    visualize_data(df, args.output_folder)
+    plt.savefig(os.path.join(args.output_folder, args.output_pdf))
     plt.close()
