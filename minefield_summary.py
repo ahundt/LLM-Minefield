@@ -32,24 +32,20 @@ def map_difficulty(difficulty):
 
 def parse_table_in_chunk(chunk_text, model_name, model_url):
     # Find the start of the table based on tab or pipe delimiters
-    start_idx_pipe = chunk_text.find('|')
-    start_idx_tab = chunk_text.find('\t')
 
-    # Determine the starting index of the table based on the delimiter found
-    start_idx = min(start_idx for start_idx in [start_idx_pipe, start_idx_tab] if start_idx != -1)
+    # Determine the delimiter by checking for pipes or tabs
+    delimiter = '|' if '|' in chunk_text else '\t'
+    start_idx = chunk_text.find(delimiter)
 
     if start_idx == -1:
         return None  # No table found in this chunk
 
     # Find the end of the table based on the absence of delimiters after the start index
-    end_idx = min(chunk_text.rfind('|', start_idx), chunk_text.rfind('\t', start_idx))
+    end_idx = chunk_text.rfind(delimiter)
     if end_idx == -1:
         end_idx = len(chunk_text)
 
     table_text = chunk_text[start_idx:end_idx].strip()  # Extracting the table portion
-
-    # Determine the delimiter by checking for pipes or tabs
-    delimiter = '|' if '|' in table_text else '\t'
 
     # Read the table text using Pandas read_csv
     df = pd.read_csv(StringIO(table_text), sep=delimiter)
