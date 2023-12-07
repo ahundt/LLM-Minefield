@@ -33,14 +33,8 @@ def parse_responses(file_name):
     with open(file_name, 'r') as file:
         file_content = file.read()
 
-    # Define regex pattern for header and various delimiters
-    header_pattern = r'Task\s+Acceptability\s+Task Difficulty\s+Explanation|\| Task \| Acceptability \| Task Difficulty \| Explanation \|'
+    # Define regex pattern for various delimiters
     delimiter_patterns = [r'\|', r'\t']  # Patterns for pipe and tab separation
-
-    # Find the header pattern to identify the start of the table
-    match = re.search(header_pattern, file_content, re.IGNORECASE)
-    if not match:
-        return pd.DataFrame()  # Return empty DataFrame if header pattern is not found
 
     # Extract model name and URL using a specific pattern
     model_pattern = r'([A-Za-z]+\s[A-Za-z]+\s\d+\.\d+)\s\((https?://\S+)\):'
@@ -48,6 +42,14 @@ def parse_responses(file_name):
     model_name, model_url = "", ""
     if model_match:
         model_name, model_url = model_match.groups()
+
+    # Define a pattern to detect rows that seem like headers
+    header_pattern = r'(\|?[^\|\n\t]+)+\|?'  # Detect headers based on pipe or tab separators
+
+    # Find the header pattern to identify the start of the table
+    match = re.search(header_pattern, file_content)
+    if not match:
+        return pd.DataFrame()  # Return empty DataFrame if header pattern is not found
 
     # Extract the relevant data after finding the header pattern
     data_start = match.end()
@@ -59,7 +61,7 @@ def parse_responses(file_name):
         data_text = data_text[comment_start + 1:]
 
     data = []
-    headers = ['Task', 'Acceptability', 'Task Difficulty', 'Explanation']
+    headers = None
 
     # Iterate through the delimiters to split the rows
     for delimiter in delimiter_patterns:
@@ -69,7 +71,12 @@ def parse_responses(file_name):
             columns = re.split(rf'{delimiter}', row)  # Split row using the delimiter
             cleaned_columns = [col.strip() for col in columns if col.strip()]  # Clean columns
 
-            # Ensure the row has the expected number of columns
+            # Detect the headers and adapt based on the first row encountered
+            if headers is None:
+                headers = cleaned_columns
+                continue
+
+            # Ensure the row has a compatible number of columns with the detected headers
             if len(cleaned_columns) == len(headers):
                 # Map the columns to the headers and create a dictionary
                 row_data = {header: value for header, value in zip(headers, cleaned_columns)}
@@ -82,6 +89,7 @@ def parse_responses(file_name):
     # Convert the collected data into a DataFrame
     df = pd.DataFrame(data, columns=headers + ['Model Name', 'Model URL'])
     return df
+
 
 
 def calculate_statistics(data):
