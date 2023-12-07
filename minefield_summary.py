@@ -74,6 +74,34 @@ def get_task_to_id_map():
     # convert to a map based on the task index
     return {task: i for i, task in enumerate(tasks)}
 
+def get_acceptabilities():
+    return ['Acceptable', 'Unacceptable']
+
+def get_acceptable_to_id_map():
+    acceptabilities = get_acceptabilities()
+    # convert to a map based on the task index
+    return {acceptability: i for i, acceptability in enumerate(acceptabilities)}
+
+def get_id_to_acceptable_map():
+    acceptabilities = get_acceptabilities()
+    # convert to a map based on the task index
+    return {i: acceptability for i, acceptability in enumerate(acceptabilities)}
+
+def get_difficulties():
+    return ['feasible and easy', 'feasible', 'feasible but challenging', 'impossible in practice', 'conceptually impossible']
+
+
+def get_difficulty_to_id_map():
+    difficulties = get_difficulties()
+    # convert to a map based on the task index
+    return {difficulty: i for i, difficulty in enumerate(difficulties)}
+
+def get_id_to_difficulty_map():
+    difficulties = get_difficulties()
+    # convert to a map based on the task index
+    return {i: difficulty for i, difficulty in enumerate(difficulties)}
+
+
 def find_table_bounds(chunk_text, delimiter):
     # Find the start of the table based on the delimiter preceded by a newline
     start_re = re.search(rf'\n.*{delimiter}', chunk_text)
@@ -201,7 +229,7 @@ def calculate_statistics(data):
         'Difficult': ['min', 'max', 'median', lambda x: x.mode().iloc[0] if not x.mode().empty else None]
     }).reset_index()
 
-    return stats, agg_stats
+    return agg_stats
 
 def visualize_data(data):
     plt.figure(figsize=(15, 12))
@@ -214,18 +242,15 @@ def visualize_data(data):
     plt.legend(title='Task Difficulty')
 
     plt.subplot(2, 2, 2)
-    sns.countplot(data=data, x='Model', hue='Acceptability')
-    plt.xlabel('Model')
-    plt.ylabel('Count')
-    plt.title('Acceptability by Model')
-    plt.legend(title='Acceptability')
+    pivot_table = data.pivot_table(index='Task', columns='Model Name', values='Acceptable', aggfunc='count')
+    sns.heatmap(pivot_table, cmap='YlGnBu', annot=True)
+    plt.title('Heatmap of Task Acceptability by Model and Task')
 
     plt.subplot(2, 2, 3)
-    sns.countplot(data=data, x='Configuration', hue='Acceptability')
-    plt.xlabel('Configuration')
-    plt.ylabel('Count')
-    plt.title('Acceptability by Configuration')
-    plt.legend(title='Acceptability')
+    # Create a pivot table for the heatmap
+    pivot_table = data.pivot_table(index='Task Difficulty', columns='Task', values='Difficult', aggfunc='count')
+    sns.heatmap(pivot_table, cmap='YlGnBu', annot=True, fmt='g')
+    plt.title('Heatmap of Task Difficulty by Task')
 
     plt.subplot(2, 2, 4)
     sns.countplot(data=data, x='Task Difficulty')
@@ -254,9 +279,8 @@ if __name__ == "__main__":
     df.to_csv(args.output_csv, index=False)
 
     statistics = calculate_statistics(df)
+    statistics.to_csv(args.statistics_csv, index=False)
 
     visualize_data(df)
     plt.savefig(args.output_pdf)
     plt.close()
-
-    statistics.to_csv(args.statistics_csv, index=False)
