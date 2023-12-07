@@ -53,6 +53,12 @@ def parse_table_in_chunk(chunk_text, model_name, model_url):
 
     # Read the table text using Pandas read_csv
     df = pd.read_csv(StringIO(table_text), sep=delimiter)
+    # Drop columns with NaN values in all rows
+    df = df.dropna(axis=1, how='all')
+    # Check if all entries in the first row are dashes
+    if all(re.match(r'^-+$', str(cell)) for cell in df.iloc[0]):
+        df = df.iloc[1:]  # Drop the first row if all entries are dashes
+
     print(f'df:\n{df}')
 
     # Add Model Name, Model URL, and other necessary columns
@@ -83,8 +89,6 @@ def split_per_model_chunks(text):
     # Find all the matches
     matches = re.finditer(pattern, text)
 
-    # **Option 1: Using next(matches)**
-
     first_chunk = text[:next(matches).start()].strip()
     model_chunks, model_names, model_urls = [], [], []
 
@@ -97,17 +101,6 @@ def split_per_model_chunks(text):
         model_names.append(match.group(1))
         model_urls.append(match.group(2))
     model_chunks.append(text[chunk_start:].strip())
-
-    # **Option 2: Using loop**
-
-    #   model_chunks, model_names, model_urls = [], [], []
-    #   first_chunk = text[:matches[0].start()].strip()
-
-    #   for match in matches:
-    #     start, end = match.span()
-    #     model_chunks.append(text[start:end].strip())
-    #     model_names.append(match.group(1))
-    #     model_urls.append(match.group(2))
 
     return model_chunks[1:], model_names, model_urls, model_chunks[0]
 
@@ -130,7 +123,11 @@ def parse_responses(file_name):
         print(f'len(model_chunk): {len(model_chunk)}')
         parsed_table = parse_table_in_chunk(model_chunk, model_name.strip(), model_url.strip())
         if parsed_table is not None:
+            # add a column for the Row number
+            parsed_table['Row Number'] = range(1, len(parsed_table) + 1)
             parsed_table['Filename'] = os.path.basename(file_name)
+            parsed_table['Model Name'] = model_name.strip()
+            parsed_table['Model URL'] = model_url.strip()
             data.append(parsed_table)
 
     return pd.concat(data, ignore_index=True) if data else pd.DataFrame(columns=headers)
@@ -139,7 +136,7 @@ def parse_responses(file_name):
 
 def calculate_statistics(data):
     print(f'data.columns: {data.columns}')
-    stats = data.groupby(['Filename', 'Configuration', 'Model Name', 'Model URL', 'Acceptability', 'Task Difficulty']).size().reset_index(name='Count')
+    stats = data.groupby(['Filename', 'Model Name', 'Model URL', 'Acceptability', 'Task Difficulty']).size().reset_index(name='Count')
     agg_stats = data.groupby(['Filename', 'Configuration', 'Model Name', 'Model URL']).agg({
         'Acceptability': ['count', 'min', 'max', 'median', lambda x: x.mode().iloc[0] if not x.mode().empty else None],
         'Task Difficulty': ['min', 'max', 'median', lambda x: x.mode().iloc[0] if not x.mode().empty else None]
