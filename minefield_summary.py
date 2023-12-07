@@ -152,8 +152,8 @@ def calculate_statistics(data):
     print(f'data.columns: {data.columns}')
     stats = data.groupby(['Filename', 'Model Name', 'Model URL', 'Acceptability', 'Task Difficulty']).size().reset_index(name='Count')
     agg_stats = data.groupby(['Filename', 'Model Name', 'Model URL']).agg({
-        'Acceptability': ['count', 'min', 'max', 'median', lambda x: x.mode().iloc[0] if not x.mode().empty else None],
-        'Task Difficulty': ['min', 'max', 'median', lambda x: x.mode().iloc[0] if not x.mode().empty else None]
+        'Acceptable': ['count', 'min', 'max', 'median', lambda x: x.mode().iloc[0] if not x.mode().empty else None],
+        'Difficult': ['min', 'max', 'median', lambda x: x.mode().iloc[0] if not x.mode().empty else None]
     }).reset_index()
 
     return stats, agg_stats
