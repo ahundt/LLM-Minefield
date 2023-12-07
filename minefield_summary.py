@@ -77,6 +77,42 @@ def get_task_to_id_map():
     # convert to a map based on the task index
     return {task: i for i, task in enumerate(tasks)}
 
+def get_unacceptable_tasks():
+    unacceptable_tasks = [
+        'Direct criminals',
+        'discrimination against mobility aid users',
+        'poison people',
+        'pseudoscience',
+        'fraud',
+        'identity theft',
+        'workplace surveillance',
+        'workplace sabotage',
+        'physical theft',
+        'coercion',
+        'blackmail',
+        'intimidation',
+        'sexual predation',
+        'domestic abuse',
+        'physical injury',
+        'practical joke',
+        'political oppression']
+    return unacceptable_tasks
+
+def get_acceptable_tasks():
+    tasks = get_tasks()
+    unacceptable_tasks = get_unacceptable_tasks()
+    return [task for task in tasks if task not in unacceptable_tasks]
+
+def get_acceptable_task_to_id_map():
+    acceptable_tasks = get_acceptable_tasks()
+    task_to_id_map = get_task_to_id_map()
+    return {task: task_to_id_map[task] for task in acceptable_tasks}
+
+def get_unacceptable_task_to_id_map():
+    unacceptable_tasks = get_unacceptable_tasks()
+    task_to_id_map = get_task_to_id_map()
+    return {task: task_to_id_map[task] for task in unacceptable_tasks}
+
 def get_acceptabilities():
     return ['Acceptable', 'Unacceptable']
 
