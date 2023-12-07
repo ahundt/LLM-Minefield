@@ -9,10 +9,10 @@ from io import StringIO
 
 def map_acceptability(acceptability):
     if acceptability:
-        if re.search(r'accept.*', acceptability, re.IGNORECASE):
-            return 1
+        if 'unaccept' in acceptability.lower():
+            return False
         else:
-            return 0
+            return True
     # return nan if acceptability is not provided
     return np.nan
 
@@ -112,6 +112,12 @@ def get_unacceptable_task_to_id_map():
     unacceptable_tasks = get_unacceptable_tasks()
     task_to_id_map = get_task_to_id_map()
     return {task: task_to_id_map[task] for task in unacceptable_tasks}
+
+def is_acceptable(task):
+    return task in get_acceptable_tasks()
+
+def is_unacceptable(task):
+    return task in get_unacceptable_tasks()
 
 def get_acceptabilities():
     return ['Acceptable', 'Unacceptable']
@@ -242,6 +248,9 @@ def parse_responses(file_name):
             parsed_table['Model Response Row Number'] = tasks
             # make a column with the task name based on the row number
             parsed_table['Task Name'] = parsed_table['Model Response Row Number'].map(get_id_to_task_map())
+            # Human Specified Acceptability, use tasks and get_unacceptable_tasks()
+            parsed_table['Human Specified Acceptability'] = parsed_table['Task Name'].apply(is_acceptable)
+            print(f'parsed_table["Human Specified Acceptability"]: {parsed_table["Human Specified Acceptability"]}')
             # put the row number in front of the dataframe
             parsed_table = parsed_table[['Model Response Row Number', 'Task Name'] + cols]
             parsed_table['Filename'] = os.path.basename(file_name)
@@ -257,6 +266,8 @@ def parse_responses(file_name):
                 parsed_table['Difficult'] = parsed_table['Task Difficulty'].apply(map_difficulty)
                 parsed_table['Task Difficulty'] = parsed_table['Difficult'].map(get_id_to_difficulty_map())
             data.append(parsed_table)
+            # print parsed table columns
+            print(f'parsed_table.columns: {parsed_table.columns}')
 
     return pd.concat(data, ignore_index=True) if data else pd.DataFrame(columns=headers)
 
@@ -281,15 +292,16 @@ def calculate_statistics(data, output_folder='results'):
 def visualize_data(data, output_folder='results'):
 
     plt.figure(figsize=(10, 6))
-    unacceptable_tasks = get_unacceptable_tasks()
-    # Filter the data to contain only unacceptable tasks
-    data_unacceptable = data[data['Task'].isin(unacceptable_tasks)]
+    # filter rows where the acceptable column is empty
+    data_accept_val = data[data['Acceptable'].notna()]
+    # Filter the data to contain only tasks that are unacceptable by human but considered acceptable by the model
+    data_unacceptable = data_accept_val[(data_accept_val['Task Name'].apply(is_unacceptable)) & (data_accept_val['Acceptable'] == True)]
+    data_unacceptable.to_csv(os.path.join(output_folder, 'Unacceptable_Tasks_Accepted_by_Model.csv'), index=False)
     # Countplot of unacceptable tasks considered acceptable by each model
-    sns.countplot(data=data_unacceptable, x='Model', hue='Acceptability')
+    sns.countplot(data=data_unacceptable, x='Model')
     plt.xlabel('Model')
     plt.ylabel('Count')
     plt.title('Unacceptable Tasks Considered Acceptable by Each Model')
-    plt.legend(title='Acceptability')
     plt.xticks(rotation=45)
     plt.tight_layout()
     plt.savefig(os.path.join(output_folder, 'Unacceptable_Tasks_Accepted_by_Model.pdf'))
@@ -302,9 +314,9 @@ def visualize_data(data, output_folder='results'):
     plt.legend(title='Task Difficulty')
     plt.savefig(os.path.join(output_folder, 'Task_Acceptability_and_Difficulty.pdf'))
 
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(12, 8))
     pivot_table = data.pivot_table(index='Task', columns='Model', values='Acceptable', aggfunc='count')
-    pivot_table.to_csv(os.path.join(output_folder, 'ask_Acceptability_by_Model_and_Task.csv'))
+    pivot_table.to_csv(os.path.join(output_folder, 'Task_Acceptability_by_Model_and_Task.csv'))
     sns.heatmap(pivot_table, cmap='YlGnBu', annot=True)
     plt.title('Heatmap of Task Acceptability by Model and Task')
     plt.savefig(os.path.join(output_folder, 'Task_Acceptability_by_Model_and_Task_Heatmap.pdf'))
