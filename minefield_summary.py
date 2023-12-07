@@ -55,9 +55,11 @@ def parse_table_in_chunk(chunk_text, model_name, model_url):
     df = pd.read_csv(StringIO(table_text), sep=delimiter)
     # Drop columns with NaN values in all rows
     df = df.dropna(axis=1, how='all')
-    # Check if all entries in the first row are dashes
-    if all(re.match(r'^-+$', str(cell)) for cell in df.iloc[0]):
-        df = df.iloc[1:]  # Drop the first row if all entries are dashes
+
+    # Check if all entries in each row of string columns are dashes
+    mask = ~(df.apply(lambda row: all(isinstance(cell, str) and cell == '-'*len(cell) for cell in row), axis=1))
+    # Filter the DataFrame to keep rows that don't have all dashes in string columns
+    filtered_df = df[mask]
 
     print(f'df:\n{df}')
 
