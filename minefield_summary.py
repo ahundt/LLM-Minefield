@@ -137,9 +137,9 @@ def parse_table_in_chunk(chunk_text, model_name, model_url):
     # Clean column titles (strip leading and trailing whitespaces)
     df.columns = df.columns.str.strip()
 
-    # Add Model Name, Model URL, and other necessary columns
-    df['Model Name'] = model_name.strip()
-    df['Model URL'] = model_url.strip()
+    # Add Model, URL, and other necessary columns
+    df['Model'] = model_name.strip()
+    df['URL'] = model_url.strip()
 
     print(f'df:\n{df}')
     return df
@@ -147,7 +147,7 @@ def parse_table_in_chunk(chunk_text, model_name, model_url):
 
 def split_per_model_chunks(text):
     """
-    Splits a text containing model information into chunks based on model names and URLs.
+    Splits a text containing model information into chunks based on Models and URLs.
 
     Args:
         text: The text to split.
@@ -155,8 +155,8 @@ def split_per_model_chunks(text):
     Returns:
         A tuple containing four lists:
         * model_chunks: A list of text chunks for each model.
-        * model_names: A list of model names.
-        * model_urls: A list of model URLs.
+        * model_names: A list of Models.
+        * model_urls: A list of URLs.
         * first_chunk: The text before the first model information.
     """
     # Define the regex pattern
@@ -206,8 +206,8 @@ def parse_responses(file_name):
             # put the row number in front of the dataframe
             parsed_table = parsed_table[['Model Response Row Number', 'Task Name'] + cols]
             parsed_table['Filename'] = os.path.basename(file_name)
-            parsed_table['Model Name'] = model_name.strip()
-            parsed_table['Model URL'] = model_url.strip()
+            parsed_table['Model'] = model_name.strip()
+            parsed_table['URL'] = model_url.strip()
             # print the parsed_table columns
             print(f'parsed_table.columns: {parsed_table.columns}')
             # Map acceptability and difficulty to numerical values
@@ -223,8 +223,8 @@ def parse_responses(file_name):
 
 def calculate_statistics(data, output_folder='results'):
     print(f'data.columns: {data.columns}')
-    stats = data.groupby(['Filename', 'Model Name', 'Model URL', 'Acceptability', 'Task Difficulty']).size().reset_index(name='Count')
-    agg_stats = data.groupby(['Filename', 'Model Name', 'Model URL']).agg({
+    stats = data.groupby(['Filename', 'Model', 'URL', 'Acceptability', 'Task Difficulty']).size().reset_index(name='Count')
+    agg_stats = data.groupby(['Filename', 'Model', 'URL']).agg({
         'Acceptable': ['count', 'min', 'max', 'median', lambda x: x.mode().iloc[0] if not x.mode().empty else None],
         'Difficult': ['min', 'max', 'median', lambda x: x.mode().iloc[0] if not x.mode().empty else None]
     }).reset_index()
@@ -247,7 +247,7 @@ def visualize_data(data):
     plt.legend(title='Task Difficulty')
 
     plt.subplot(2, 2, 2)
-    pivot_table = data.pivot_table(index='Task', columns='Model Name', values='Acceptable', aggfunc='count')
+    pivot_table = data.pivot_table(index='Task', columns='Model', values='Acceptable', aggfunc='count')
     sns.heatmap(pivot_table, cmap='YlGnBu', annot=True)
     plt.title('Heatmap of Task Acceptability by Model and Task')
 
