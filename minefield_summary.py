@@ -59,15 +59,16 @@ def parse_table_in_chunk(chunk_text, model_name, model_url):
     # Check if all entries in each row of string columns are dashes
     mask = ~(df.apply(lambda row: all(isinstance(cell, str) and cell == '-'*len(cell) for cell in row), axis=1))
     # Filter the DataFrame to keep rows that don't have all dashes in string columns
-    filtered_df = df[mask]
+    df = df[mask]
 
-    print(f'df:\n{df}')
+    # Clean column titles (strip leading and trailing whitespaces)
+    df.columns = df.columns.str.strip()
 
     # Add Model Name, Model URL, and other necessary columns
-    df['Model Name'] = model_name
-    df['Model URL'] = model_url
-    df['Filename'] = ''  # Placeholder for Filename column
+    df['Model Name'] = model_name.strip()
+    df['Model URL'] = model_url.strip()
 
+    print(f'df:\n{df}')
     return df
 
 
@@ -139,7 +140,7 @@ def parse_responses(file_name):
 def calculate_statistics(data):
     print(f'data.columns: {data.columns}')
     stats = data.groupby(['Filename', 'Model Name', 'Model URL', 'Acceptability', 'Task Difficulty']).size().reset_index(name='Count')
-    agg_stats = data.groupby(['Filename', 'Configuration', 'Model Name', 'Model URL']).agg({
+    agg_stats = data.groupby(['Filename', 'Model Name', 'Model URL']).agg({
         'Acceptability': ['count', 'min', 'max', 'median', lambda x: x.mode().iloc[0] if not x.mode().empty else None],
         'Task Difficulty': ['min', 'max', 'median', lambda x: x.mode().iloc[0] if not x.mode().empty else None]
     }).reset_index()
