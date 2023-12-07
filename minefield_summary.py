@@ -305,6 +305,9 @@ def visualize_data(data, output_folder='results'):
     plt.xticks(rotation=45)
     plt.tight_layout()
     plt.savefig(os.path.join(output_folder, 'Unacceptable_Tasks_Accepted_by_Model.pdf'))
+    # pivot table listing the name of unacceptable tasks considered acceptable by each model
+    pivot_table = data_unacceptable.pivot_table(index='Task Name', columns='Model', values='Acceptable', aggfunc='count')
+    pivot_table.to_csv(os.path.join(output_folder, 'Unacceptable_Tasks_Accepted_by_Model_Summary.csv'))
 
     plt.figure(figsize=(10, 6))
     sns.countplot(data=data, x='Acceptability', hue='Task Difficulty')
