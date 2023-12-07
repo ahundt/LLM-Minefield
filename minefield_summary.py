@@ -30,20 +30,27 @@ def map_difficulty(difficulty):
         return -1  # Default value if difficulty doesn't match any predefined categories
 
 
+def find_table_bounds(chunk_text, delimiter):
+    # Find the start of the table based on the delimiter preceded by a newline
+    start_re = re.search(rf'\n.*{delimiter}', chunk_text)
+    start_idx = start_re.start() + 1 if start_re else -1
+
+    # Find the end of the table based on the last delimiter followed by a newline
+    end_re = re.search(fr'{delimiter}.*\n', chunk_text[::-1])
+    end_idx = len(chunk_text) - end_re.end() if end_re else -1
+
+    return start_idx, end_idx
+
+
 def parse_table_in_chunk(chunk_text, model_name, model_url):
     # Find the start of the table based on tab or pipe delimiters
 
     # Determine the delimiter by checking for pipes or tabs
     delimiter = '|' if '|' in chunk_text else '\t'
-    start_idx = chunk_text.find(delimiter)
+    start_idx, end_idx = find_table_bounds(chunk_text, delimiter)
 
     if start_idx == -1:
         return None  # No table found in this chunk
-
-    # Find the end of the table based on the absence of delimiters after the start index
-    end_idx = chunk_text.rfind(delimiter)
-    if end_idx == -1:
-        end_idx = len(chunk_text)
 
     table_text = chunk_text[start_idx:end_idx].strip()  # Extracting the table portion
 
