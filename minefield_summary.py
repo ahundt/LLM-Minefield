@@ -221,14 +221,19 @@ def parse_responses(file_name):
 
 
 
-def calculate_statistics(data):
+def calculate_statistics(data, output_folder='results'):
     print(f'data.columns: {data.columns}')
     stats = data.groupby(['Filename', 'Model Name', 'Model URL', 'Acceptability', 'Task Difficulty']).size().reset_index(name='Count')
     agg_stats = data.groupby(['Filename', 'Model Name', 'Model URL']).agg({
         'Acceptable': ['count', 'min', 'max', 'median', lambda x: x.mode().iloc[0] if not x.mode().empty else None],
         'Difficult': ['min', 'max', 'median', lambda x: x.mode().iloc[0] if not x.mode().empty else None]
     }).reset_index()
+    agg_stats.to_csv(os.path.join(output_folder,'aggregated_statistics.csv'), index=False)
 
+    # Calculate the count of 'Difficult' for each 'Task' and 'Model'
+    difficult_count = data.groupby(['Task', 'Model'])['Difficult'].count().reset_index()
+    difficult_count.rename(columns={'Difficult': 'Difficult Count'}, inplace=True)
+    difficult_count.to_csv(os.path.join(output_folder,'difficulty_count.csv'), index=False)
     return agg_stats
 
 def visualize_data(data):
@@ -263,20 +268,24 @@ def visualize_data(data):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process folder of files')
-    parser.add_argument('--folder_path', type=str, default='responses', help='Path to the folder containing files')
+    parser.add_argument('--input_folder', type=str, default='responses', help='Path to the folder containing files')
+    parser.add_argument('--output_folder', type=str, default='results', help='Path to the output folder')
     parser.add_argument('--output_csv', type=str, default='default_output.csv', help='Path to output CSV file')
     parser.add_argument('--output_pdf', type=str, default='default_output.pdf', help='Path to output PDF file')
     parser.add_argument('--statistics_csv', type=str, default='statistics_output.csv', help='Path to output statistics CSV file')
     args = parser.parse_args()
 
-    files = [os.path.join(args.folder_path, file_name) for file_name in os.listdir(args.folder_path)
+    # make the output folder, and it is ok if it exists
+    os.makedirs(args.output_folder, exist_ok=True)
+
+    files = [os.path.join(args.input_folder, file_name) for file_name in os.listdir(args.input_folder)
              if file_name.endswith('.txt') or file_name.endswith('.md')]
 
     parsed_data = []
     for file_name in files:
         parsed_data.append(parse_responses(file_name))
     df = pd.concat(parsed_data, ignore_index=True)
-    df.to_csv(args.output_csv, index=False)
+    df.to_csv(os.path.join(args.output_folder, args.output_csv), index=False)
 
     statistics = calculate_statistics(df)
     statistics.to_csv(args.statistics_csv, index=False)
