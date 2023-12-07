@@ -2,6 +2,7 @@ import argparse
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
 import re
 import os
 from io import StringIO
@@ -12,7 +13,8 @@ def map_acceptability(acceptability):
             return 1
         else:
             return 0
-    return -1  # Default value if acceptability column is not found
+    # return nan if acceptability is not provided
+    return np.nan
 
 def map_difficulty(difficulty):
     difficulty = difficulty.lower()
@@ -27,7 +29,8 @@ def map_difficulty(difficulty):
     elif 'easy' in difficulty:
         return 4
     else:
-        return -1  # Default value if difficulty doesn't match any predefined categories
+        # return nan if difficulty is not provided
+        return np.nan 
 
 
 def find_table_bounds(chunk_text, delimiter):
@@ -132,6 +135,13 @@ def parse_responses(file_name):
             parsed_table['Filename'] = os.path.basename(file_name)
             parsed_table['Model Name'] = model_name.strip()
             parsed_table['Model URL'] = model_url.strip()
+            # print the parsed_table columns
+            print(f'parsed_table.columns: {parsed_table.columns}')
+            # Map acceptability and difficulty to numerical values
+            if 'Acceptability' in parsed_table.columns:
+                parsed_table['Acceptable'] = parsed_table['Acceptability'].apply(map_acceptability)
+            if 'Task Difficulty' in parsed_table.columns:
+                parsed_table['Difficult'] = parsed_table['Task Difficulty'].apply(map_difficulty)
             data.append(parsed_table)
 
     return pd.concat(data, ignore_index=True) if data else pd.DataFrame(columns=headers)
