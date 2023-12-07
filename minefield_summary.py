@@ -56,10 +56,8 @@ def parse_table_in_chunk(chunk_text, model_name, model_url):
     # Drop columns with NaN values in all rows
     df = df.dropna(axis=1, how='all')
 
-    # Check if all entries in each row of string columns are dashes
-    mask = ~(df.apply(lambda row: all(isinstance(cell, str) and cell == '-'*len(cell) for cell in row), axis=1))
-    # Filter the DataFrame to keep rows that don't have all dashes in string columns
-    df = df[mask]
+    # Drop row if all entries in each row of string columns are dashes
+    df = df[~df.select_dtypes(include='object').apply(lambda x: x.str.contains('-+')).all(axis=1)]
 
     # Clean column titles (strip leading and trailing whitespaces)
     df.columns = df.columns.str.strip()
@@ -118,7 +116,7 @@ def parse_responses(file_name):
     headers = ['Task', 'Acceptability', 'Task Difficulty', 'Explanation']
 
     for model_name, model_url, model_chunk in zip(model_names, model_urls, model_chunks):
-        if model_chunk is None:
+        if model_chunk is None or 'note' in model_name.lower():
             continue
         # print the len of each
         print(f'len(model_name): {len(model_name)} model_name: {model_name}')
