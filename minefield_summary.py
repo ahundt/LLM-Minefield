@@ -29,66 +29,68 @@ def map_difficulty(difficulty):
         return -1  # Default value if difficulty doesn't match any predefined categories
 
 
+def parse_table_in_chunk(chunk_text, model_name, model_url):
+    # Find the start of the table based on tab or pipe delimiters
+    start_idx_pipe = chunk_text.find('|')
+    start_idx_tab = chunk_text.find('\t')
+
+    # Determine the starting index of the table based on the delimiter found
+    start_idx = min(start_idx for start_idx in [start_idx_pipe, start_idx_tab] if start_idx != -1)
+
+    if start_idx == -1:
+        return None  # No table found in this chunk
+
+    # Find the end of the table based on the absence of delimiters after the start index
+    end_idx = min(chunk_text.rfind('|', start_idx), chunk_text.rfind('\t', start_idx))
+    if end_idx == -1:
+        end_idx = len(chunk_text)
+
+    table_text = chunk_text[start_idx:end_idx].strip()  # Extracting the table portion
+
+    # Determine the delimiter by checking for pipes or tabs
+    delimiter = '|' if '|' in table_text else '\t'
+
+    # Read the table text using Pandas read_csv
+    df = pd.read_csv(pd.compat.StringIO(table_text), sep=delimiter)
+
+    # Add Model Name, Model URL, and other necessary columns
+    df['Model Name'] = model_name
+    df['Model URL'] = model_url
+    df['Filename'] = ''  # Placeholder for Filename column
+
+    return df
+
+
+def split_per_model_chunks(text):
+    # Define regex pattern to match model name and response URL
+    pattern = r'\n([A-Z][a-z]+(?: [A-Z][a-z]+)*) \(?(https?://\S+)?\)?'
+    matches = re.findall(pattern, text)
+    model_names, model_urls = zip(*matches)
+    model_chunks = re.split(pattern, text)[2::3]
+    return model_names, model_urls, model_chunks
+    return model_names, model_urls, model_chunks
+
 def parse_responses(file_name):
     with open(file_name, 'r') as file:
         file_content = file.read()
 
-    # Define regex pattern for various delimiters
-    delimiter_patterns = [r'\|', r'\t']  # Patterns for pipe and tab separation
-
-    # Extract model name and URL using a specific pattern
-    model_pattern = r'([A-Za-z]+\s[A-Za-z]+\s\d+\.\d+)\s\((https?://\S+)\):'
-    model_match = re.search(model_pattern, file_content)
-    model_name, model_url = "", ""
-    if model_match:
-        model_name, model_url = model_match.groups()
-
-    # Define a pattern to detect rows that seem like headers
-    header_pattern = r'(\|?[^\|\n\t]+)+\|?'  # Detect headers based on pipe or tab separators
-
-    # Find the header pattern to identify the start of the table
-    match = re.search(header_pattern, file_content)
-    if not match:
-        return pd.DataFrame()  # Return empty DataFrame if header pattern is not found
-
-    # Extract the relevant data after finding the header pattern
-    data_start = match.end()
-    data_text = file_content[data_start:]
-
-    # Skip comments before the table, if any
-    if '#' in data_text:
-        comment_start = data_text.index('#')
-        data_text = data_text[comment_start + 1:]
-
+    model_names, model_urls, model_chunks = split_per_model_chunks(file_content)
     data = []
-    headers = None
+    headers = ['Task', 'Acceptability', 'Task Difficulty', 'Explanation']
 
-    # Iterate through the delimiters to split the rows
-    for delimiter in delimiter_patterns:
-        rows = re.findall(rf'(?s)\|?(.*?)\{delimiter}', data_text)  # Extract rows with delimiter
+    for model_name, model_url, model_chunk in zip(model_names, model_urls, model_chunks):
+        if model_chunk is None:
+            continue
+        # print the len of each
+        print(f'len(model_name): {len(model_name)} model_name: {model_name}')
+        print(f'len(model_url): {len(model_url)} model_url: {model_url}')
+        print(f'len(model_chunk): {len(model_chunk)}')
+        parsed_table = parse_table_in_chunk(model_chunk, model_name.strip(), model_url.strip())
+        if parsed_table is not None:
+            parsed_table['Filename'] = os.path.basename(file_name)
+            data.append(parsed_table)
 
-        for row in rows:
-            columns = re.split(rf'{delimiter}', row)  # Split row using the delimiter
-            cleaned_columns = [col.strip() for col in columns if col.strip()]  # Clean columns
-
-            # Detect the headers and adapt based on the first row encountered
-            if headers is None:
-                headers = cleaned_columns
-                continue
-
-            # Ensure the row has a compatible number of columns with the detected headers
-            if len(cleaned_columns) == len(headers):
-                # Map the columns to the headers and create a dictionary
-                row_data = {header: value for header, value in zip(headers, cleaned_columns)}
-                row_data['Filename'] = os.path.basename(file_name)  # Include Filename in DataFrame
-                row_data['Model Name'] = model_name  # Include Model Name
-                row_data['Model URL'] = model_url  # Include Model URL
-
-                data.append(row_data)
-
-    # Convert the collected data into a DataFrame
-    df = pd.DataFrame(data, columns=headers + ['Model Name', 'Model URL'])
-    return df
+    return pd.concat(data, ignore_index=True) if data else pd.DataFrame(columns=headers)
 
 
 
