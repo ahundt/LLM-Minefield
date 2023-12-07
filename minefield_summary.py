@@ -33,39 +33,59 @@ def parse_responses(file_name):
     with open(file_name, 'r') as file:
         file_content = file.read()
 
-    lines = file_content.strip().split('\n')
+    # Define regex pattern for header and various delimiters
+    header_pattern = r'Task\s+Acceptability\s+Task Difficulty\s+Explanation|\| Task \| Acceptability \| Task Difficulty \| Explanation \|'
+    delimiter_patterns = [r'\|', r'\t']  # Patterns for pipe and tab separation
+
+    # Find the header pattern to identify the start of the table
+    match = re.search(header_pattern, file_content, re.IGNORECASE)
+    if not match:
+        return pd.DataFrame()  # Return empty DataFrame if header pattern is not found
+
+    # Extract model name and URL using a specific pattern
+    model_pattern = r'([A-Za-z]+\s[A-Za-z]+\s\d+\.\d+)\s\((https?://\S+)\):'
+    model_match = re.search(model_pattern, file_content)
+    model_name, model_url = "", ""
+    if model_match:
+        model_name, model_url = model_match.groups()
+
+    # Extract the relevant data after finding the header pattern
+    data_start = match.end()
+    data_text = file_content[data_start:]
+
+    # Skip comments before the table, if any
+    if '#' in data_text:
+        comment_start = data_text.index('#')
+        data_text = data_text[comment_start + 1:]
+
     data = []
     headers = ['Task', 'Acceptability', 'Task Difficulty', 'Explanation']
-    model_url = re.findall(r'(https?://\S+)', file_content)  # Extract URLs
-    model_name = re.findall(r'\b([A-Z][a-z]+(?: [A-Z][a-z]+)*)\b \(?(https?://\S+)?\)?', file_content)  # Extract Model Names and URLs
 
-    for line in lines[2:]:
-        parts = re.split(r'\t+|\s{2,}', line.strip())
-        task = parts[0]
+    # Iterate through the delimiters to split the rows
+    for delimiter in delimiter_patterns:
+        rows = re.findall(rf'(?s)\|?(.*?)\{delimiter}', data_text)  # Extract rows with delimiter
 
-        acceptability = -1
-        if len(parts) > 1:
-            acceptability = map_acceptability(parts[1])
+        for row in rows:
+            columns = re.split(rf'{delimiter}', row)  # Split row using the delimiter
+            cleaned_columns = [col.strip() for col in columns if col.strip()]  # Clean columns
 
-        task_difficulty = -1
-        if len(parts) > 2:
-            task_difficulty = map_difficulty(parts[2])
+            # Ensure the row has the expected number of columns
+            if len(cleaned_columns) == len(headers):
+                # Map the columns to the headers and create a dictionary
+                row_data = {header: value for header, value in zip(headers, cleaned_columns)}
+                row_data['Filename'] = os.path.basename(file_name)  # Include Filename in DataFrame
+                row_data['Model Name'] = model_name  # Include Model Name
+                row_data['Model URL'] = model_url  # Include Model URL
 
-        explanation = ' '.join(parts[3:])
+                data.append(row_data)
 
-        data.append({
-            headers[0]: task,
-            headers[1]: acceptability,
-            headers[2]: task_difficulty,
-            headers[3]: explanation,
-            'Model URL': model_url[0] if model_url else None,
-            'Model Name': model_name[0][0] if model_name else None,
-            'Filename': file_name  # Include Filename in DataFrame
-        })
+    # Convert the collected data into a DataFrame
+    df = pd.DataFrame(data, columns=headers + ['Model Name', 'Model URL'])
+    return df
 
-    return pd.DataFrame(data, columns=headers)
 
 def calculate_statistics(data):
+    print(f'data.columns: {data.columns}')
     stats = data.groupby(['Filename', 'Configuration', 'Model Name', 'Model URL', 'Acceptability', 'Task Difficulty']).size().reset_index(name='Count')
     agg_stats = data.groupby(['Filename', 'Configuration', 'Model Name', 'Model URL']).agg({
         'Acceptability': ['count', 'min', 'max', 'median', lambda x: x.mode().iloc[0] if not x.mode().empty else None],
@@ -122,6 +142,7 @@ if __name__ == "__main__":
     for file_name in files:
         parsed_data.append(parse_responses(file_name))
     df = pd.concat(parsed_data, ignore_index=True)
+    df.to_csv(args.output_csv, index=False)
 
     statistics = calculate_statistics(df)
 
@@ -129,5 +150,4 @@ if __name__ == "__main__":
     plt.savefig(args.output_pdf)
     plt.close()
 
-    df.to_csv(args.output_csv, index=False)
     statistics.to_csv(args.statistics_csv, index=False)
