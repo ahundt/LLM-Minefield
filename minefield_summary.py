@@ -223,7 +223,7 @@ def split_per_model_chunks(text):
         * model_urls: A list of URLs.
         * first_chunk: The text before the first model information.
     """
-    # Define the regex pattern
+    # Define the regex pattern for loading in the name and URL of each model
     pattern = r"\n([^\n]+) \((https?://\S+)\)\:\s*\n"
 
     # Find all the matches
@@ -252,7 +252,7 @@ def parse_responses(file_name):
     data = []
     headers = ['Task', 'Acceptability', 'Task Difficulty', 'Explanation']
 
-    for model_name, model_url, model_chunk in zip(model_names, model_urls, model_chunks):
+    for i, (model_name, model_url, model_chunk) in enumerate(zip(model_names, model_urls, model_chunks)):
         if model_chunk is None or 'note' in model_name.lower():
             continue
         # print the len of each
@@ -263,15 +263,16 @@ def parse_responses(file_name):
         if parsed_table is not None:
             # add a column for the Model Response Row to the front of the dataframe
             cols = parsed_table.columns.tolist()
+            parsed_table['Model Response Table Index'] = i + 1
             tasks = range(1, len(parsed_table) + 1)
-            parsed_table['Model Response Row Number'] = tasks
+            parsed_table['Model Response Row Index'] = tasks
             # make a column with the task name based on the row number
-            parsed_table['Task Name'] = parsed_table['Model Response Row Number'].map(get_id_to_task_map())
+            parsed_table['Task Name'] = parsed_table['Model Response Row Index'].map(get_id_to_task_map())
             # Human Specified Acceptability, use tasks and get_unacceptable_tasks()
             parsed_table['Human Specified Acceptability'] = parsed_table['Task Name'].apply(is_acceptable)
             print(f'parsed_table["Human Specified Acceptability"]: {parsed_table["Human Specified Acceptability"]}')
             # put the row number in front of the dataframe
-            parsed_table = parsed_table[['Model Response Row Number', 'Task Name'] + cols]
+            parsed_table = parsed_table[['Model Response Row Index', 'Task Name'] + cols]
             parsed_table['Filename'] = os.path.basename(file_name)
             parsed_table['Model'] = model_name.strip()
             parsed_table['URL'] = model_url.strip()
