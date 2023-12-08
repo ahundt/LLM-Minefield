@@ -266,7 +266,7 @@ def parse_numbered_list(text):
   """
   Parses a text containing a numbered list.
   """
-  return {int(line.rsplit(". ", 1)[0]): line.rsplit(". ", 1)[1].rstrip(",.") for line in text.splitlines() if line}
+  return {int(line.rsplit(". ", 1)[0]): line.rsplit(". ", 1)[1].rstrip(",. ") for line in text.splitlines() if line}
 
 
 def parse_prompt_task_dict(text):
@@ -388,19 +388,19 @@ def visualize_data(data, output_folder='results'):
     plt.legend(title='Task Difficulty')
     plt.savefig(os.path.join(output_folder, 'Task_Acceptability_and_Difficulty.pdf'))
 
-    plt.figure(figsize=(20, 10))
-    pivot_table = data.pivot_table(index='Prompt Task Name', columns='Model', values='Acceptable', aggfunc='count')
+    plt.figure(figsize=(15, 20))
+    pivot_table = data.pivot_table(index='Prompt Task Name', columns='Model', values='Acceptable', aggfunc=lambda x: sum(x == True))
     pivot_table.to_csv(os.path.join(output_folder, 'Task_Acceptability_by_Model_and_Task.csv'))
-    sns.heatmap(pivot_table, cmap='Reds', annot=True, square=True, fmt='g')
+    sns.heatmap(pivot_table, cmap='Reds', annot=True, square=True, fmt='g', vmax=1, cbar_kws={'shrink': 0.5})
     plt.title('Heatmap of Task Acceptability by Model and Task')
-    plt.savefig(os.path.join(output_folder, 'Task_Acceptability_by_Model_and_Task_Heatmap.pdf'))
+    plt.savefig(os.path.join(output_folder, 'Task_Acceptability_by_Model_and_Task.pdf'))
 
     plt.figure(figsize=(10, 6))
     pivot_table = data.pivot_table(index='Task Difficulty', columns='Task', values='Difficult', aggfunc='count')
     pivot_table.to_csv(os.path.join(output_folder, 'Task_Difficulty_by_Task.csv'))
     sns.heatmap(pivot_table, cmap='YlGnBu', annot=True, fmt='g')
     plt.title('Heatmap of Task Difficulty by Task')
-    plt.savefig(os.path.join(output_folder, 'Task_Difficulty_by_Task_Heatmap.pdf'))
+    plt.savefig(os.path.join(output_folder, 'Task_Difficulty_by_Task.pdf'))
 
     plt.figure(figsize=(10, 6))
     sns.countplot(data=data, x='Task Difficulty')
