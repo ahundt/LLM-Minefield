@@ -247,8 +247,6 @@ def split_per_model_chunks(text):
 
     # Find all the matches
     matches = re.finditer(pattern, text)
-
-    first_chunk = text[:next(matches).start()].strip()
     model_chunks, model_names, model_urls = [], [], []
 
     chunk_start = 0
@@ -263,14 +261,40 @@ def split_per_model_chunks(text):
 
     return model_chunks[1:], model_names, model_urls, model_chunks[0]
 
+
+def parse_numbered_list(text):
+  """
+  Parses a text containing a numbered list.
+  """
+  return {int(line.rsplit(". ", 1)[0]): line.rsplit(". ", 1)[1].rstrip(",.") for line in text.splitlines() if line}
+
+
+def parse_prompt_task_dict(text):
+    """
+    Parses a text containing a prompt and returns a dictionary of tasks.
+    """
+    # strip the whitespace then find the text from User to the end
+    text = text.strip()
+    start_idx = text.find('User:')
+    prompt = text[start_idx:]
+    # reverse find '1.' to get the action list
+    action_list_start_idx = prompt.rfind('\n1. ')
+    task_dict = parse_numbered_list(prompt[action_list_start_idx:])
+    # find the min key and subtract it from all the keys to make the keys start from 0
+    min_key = min(task_dict.keys())
+    task_dict = {key - min_key: value for key, value in task_dict.items()}
+    return task_dict
+
+
 def parse_responses(file_name):
     with open(file_name, 'r') as file:
         file_content = file.read()
 
     model_chunks, model_names, model_urls, first_chunk = split_per_model_chunks(file_content)
-    data = []
-    headers = ['Task', 'Acceptability', 'Task Difficulty', 'Explanation']
+    # The tasks as specified in the prompt, e.g. "1. Sort Objects, 2. Direct People 3. ..."
+    prompt_task_dict = parse_prompt_task_dict(first_chunk)
 
+    data = []
     for i, (model_name, model_url, model_chunk) in enumerate(zip(model_names, model_urls, model_chunks)):
         if model_chunk is None or 'note' in model_name.lower():
             continue
@@ -281,17 +305,19 @@ def parse_responses(file_name):
         parsed_table = parse_table_in_chunk(model_chunk, model_name.strip(), model_url.strip())
         if parsed_table is not None:
             # add a column for the Model Response Row to the front of the dataframe
-            cols = parsed_table.columns.tolist()
             parsed_table['Model Response Table Index'] = i
             tasks = range(len(parsed_table))
             parsed_table['Model Response Row Index'] = tasks
             # make a column with the task name based on the row number
             parsed_table['Task Name'] = parsed_table['Model Response Row Index'].map(get_id_to_task_map())
+            parsed_table['Prompt Task Name'] = prompt_task_dict.values()
+            print(f'parsed_table.columns Prompt Task Name: {parsed_table.columns}')
             # Human Specified Acceptability, use tasks and get_unacceptable_tasks()
             parsed_table['Human Specified Acceptability'] = parsed_table['Task Name'].apply(is_acceptable)
             print(f'parsed_table["Human Specified Acceptability"]: {parsed_table["Human Specified Acceptability"]}')
-            # put the row number in front of the dataframe
-            parsed_table = parsed_table[['Model Response Row Index', 'Task Name'] + cols]
+            # put ['Model Response Row Index', 'Task Name'] in front of the dataframe
+            front_cols = ['Model Response Row Index', 'Task Name', 'Prompt Task Name']
+            parsed_table = parsed_table[front_cols + [col for col in parsed_table.columns if col not in front_cols]]
             parsed_table['Filename'] = os.path.basename(file_name)
             parsed_table['Model'] = model_name.strip()
             parsed_table['URL'] = model_url.strip()
@@ -305,11 +331,15 @@ def parse_responses(file_name):
             if 'Task Difficulty' in parsed_table.columns:
                 parsed_table['Difficult'] = parsed_table['Task Difficulty'].apply(map_difficulty)
                 parsed_table['Task Difficulty'] = parsed_table['Difficult'].map(get_id_to_difficulty_map())
-            data.append(parsed_table)
+            data.append(parsed_table.copy())
             # print parsed table columns
             print(f'parsed_table.columns: {parsed_table.columns}')
 
-    return pd.concat(data, ignore_index=True) if data else pd.DataFrame(columns=headers)
+    if data:
+        data = pd.concat(data, ignore_index=True)
+        print(f'data.columns: {data.columns}')
+        return data
+    return None
 
 
 
@@ -331,6 +361,7 @@ def calculate_statistics(data, output_folder='results'):
 
 def visualize_data(data, output_folder='results'):
     data = data.copy()  # make a copy of the data to avoid modifying the original data`
+    print(f'data.columns: {data.columns}')
     plt.figure(figsize=(10, 6))
     # filter rows where the acceptable column is empty
     data_accept_val = data[data['Acceptable'].notna()]
@@ -357,10 +388,10 @@ def visualize_data(data, output_folder='results'):
     plt.legend(title='Task Difficulty')
     plt.savefig(os.path.join(output_folder, 'Task_Acceptability_and_Difficulty.pdf'))
 
-    plt.figure(figsize=(12, 8))
-    pivot_table = data.pivot_table(index='Task', columns='Model', values='Acceptable', aggfunc='count')
+    plt.figure(figsize=(20, 10))
+    pivot_table = data.pivot_table(index='Prompt Task Name', columns='Model', values='Acceptable', aggfunc='count')
     pivot_table.to_csv(os.path.join(output_folder, 'Task_Acceptability_by_Model_and_Task.csv'))
-    sns.heatmap(pivot_table, cmap='YlGnBu', annot=True)
+    sns.heatmap(pivot_table, cmap='Reds', annot=True, square=True, fmt='g')
     plt.title('Heatmap of Task Acceptability by Model and Task')
     plt.savefig(os.path.join(output_folder, 'Task_Acceptability_by_Model_and_Task_Heatmap.pdf'))
 
@@ -396,7 +427,11 @@ if __name__ == "__main__":
 
     parsed_data = []
     for file_name in files:
-        parsed_data.append(parse_responses(file_name))
+        df = parse_responses(file_name)
+        if df is not None:
+            parsed_data.append(df.copy())
+        else:
+            print(f'WARNING: No data found in {file_name}')
     df = pd.concat(parsed_data, ignore_index=True)
     df.to_csv(os.path.join(args.output_folder, args.output_csv), index=False)
 
