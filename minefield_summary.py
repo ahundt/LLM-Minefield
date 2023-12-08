@@ -17,6 +17,9 @@ def map_acceptability(acceptability):
     return np.nan
 
 def map_difficulty(difficulty):
+    # if difficulty is not a string return nan
+    if not isinstance(difficulty, str):
+        return np.nan
     difficulty = difficulty.lower()
     if 'conceptually' in difficulty:
         # conceptually impossible
@@ -148,13 +151,29 @@ def get_id_to_difficulty_map():
 
 
 def find_table_bounds(chunk_text, delimiter):
-    # Find the start of the table based on the delimiter preceded by a newline
-    start_re = re.search(rf'\n.*{delimiter}', chunk_text)
-    start_idx = start_re.start() + 1 if start_re else -1
+    # Find the first delimiter index
+    first_delimiter_idx = chunk_text.find(delimiter)
+    if first_delimiter_idx == -1:
+        return -1, -1  # No table found in this chunk
+    # get the text up to the delimiter
+    first_delimiter_text = chunk_text[:first_delimiter_idx]
+    # reverse search for a newline
+    newline_idx = first_delimiter_text.rfind('\n')
+    # Set start_idx to the distance from the start of chunk_text to the newline
+    # if newline is not found set start_idx to 0
+    start_idx = newline_idx + 1 if newline_idx != -1 else 0
 
-    # Find the end of the table based on the last delimiter followed by a newline
-    end_re = re.search(fr'{delimiter}.*\n', chunk_text[::-1])
-    end_idx = len(chunk_text) - end_re.end() if end_re else -1
+    # Find the last delimiter index
+    last_delimiter_idx = chunk_text.rfind(delimiter)
+    if last_delimiter_idx == -1:
+        return -1, -1  # No table found in this chunk
+    # get the text after the delimiter
+    last_delimiter_text = chunk_text[last_delimiter_idx + 1:]
+    # search for a newline
+    newline_idx = last_delimiter_text.find('\n')
+    # Set end_idx to the distance from the start of chunk_text to the newline
+    # if newline is not found set end_idx to the length of chunk_text
+    end_idx = last_delimiter_idx + newline_idx if newline_idx != -1 else len(chunk_text)
 
     return start_idx, end_idx
 
