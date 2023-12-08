@@ -267,7 +267,7 @@ def parse_responses(file_name):
             # add a column for the Model Response Row to the front of the dataframe
             cols = parsed_table.columns.tolist()
             parsed_table['Model Response Table Index'] = i + 1
-            tasks = range(1, len(parsed_table) + 1)
+            tasks = range(len(parsed_table))
             parsed_table['Model Response Row Index'] = tasks
             # make a column with the task name based on the row number
             parsed_table['Task Name'] = parsed_table['Model Response Row Index'].map(get_id_to_task_map())
