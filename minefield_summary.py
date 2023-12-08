@@ -415,7 +415,7 @@ if __name__ == "__main__":
     parser.add_argument('--input_folder', type=str, default='responses', help='Path to the folder containing files')
     parser.add_argument('--output_folder', type=str, default='results', help='Path to the output folder')
     parser.add_argument('--output_csv', type=str, default='default_output.csv', help='Path to output CSV file')
-    parser.add_argument('--output_pdf', type=str, default='default_output.pdf', help='Path to output PDF file')
+    # parser.add_argument('--output_pdf', type=str, default='default_output.pdf', help='Path to output PDF file')
     parser.add_argument('--statistics_csv', type=str, default='statistics_output.csv', help='Path to output statistics CSV file')
     args = parser.parse_args()
 
@@ -437,5 +437,5 @@ if __name__ == "__main__":
 
     calculate_statistics(df, args.output_folder)
     visualize_data(df, args.output_folder)
-    plt.savefig(os.path.join(args.output_folder, args.output_pdf))
-    plt.close()
+    # plt.savefig(os.path.join(args.output_folder, args.output_pdf))
+    # plt.close()
