@@ -282,7 +282,7 @@ def parse_responses(file_name):
         if parsed_table is not None:
             # add a column for the Model Response Row to the front of the dataframe
             cols = parsed_table.columns.tolist()
-            parsed_table['Model Response Table Index'] = i + 1
+            parsed_table['Model Response Table Index'] = i
             tasks = range(len(parsed_table))
             parsed_table['Model Response Row Index'] = tasks
             # make a column with the task name based on the row number
