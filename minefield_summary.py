@@ -7,7 +7,7 @@ import re
 import os
 from io import StringIO
 
-def map_acceptability(acceptability):
+def map_acceptability_to_bool(acceptability):
     if acceptability:
         if 'unaccept' in acceptability.lower():
             return False
@@ -15,6 +15,22 @@ def map_acceptability(acceptability):
             return True
     # return nan if acceptability is not provided
     return np.nan
+
+def map_acceptability_to_str(acceptability):
+    # if accessibility is a string
+    if isinstance(acceptability, str):
+        if 'unaccept' in acceptability.lower():
+            return 'Unacceptable'
+        else:
+            return 'Acceptable'
+    # nan and none stays as is
+    elif pd.isna(acceptability) or acceptability is None:
+        return acceptability
+    # elif acceptability is convertible to a boolean
+    elif acceptability:
+        return 'Acceptable'
+    else:
+        return 'Unacceptable'
 
 def map_difficulty(difficulty):
     # if difficulty is not a string return nan
@@ -283,8 +299,9 @@ def parse_responses(file_name):
             print(f'parsed_table.columns: {parsed_table.columns}')
             # Map acceptability and difficulty to numerical values
             if 'Acceptability' in parsed_table.columns:
-                parsed_table['Acceptable'] = parsed_table['Acceptability'].apply(map_acceptability)
-                parsed_table['Acceptability'] = parsed_table['Acceptable'].map(get_id_to_acceptable_map())
+                parsed_table['Acceptable'] = parsed_table['Acceptability'].apply(map_acceptability_to_bool)
+                # use the standardized acceptability names "Acceptable" and "Unacceptable"
+                parsed_table['Acceptability'] = parsed_table['Acceptable'].apply(map_acceptability_to_str)
             if 'Task Difficulty' in parsed_table.columns:
                 parsed_table['Difficult'] = parsed_table['Task Difficulty'].apply(map_difficulty)
                 parsed_table['Task Difficulty'] = parsed_table['Difficult'].map(get_id_to_difficulty_map())
