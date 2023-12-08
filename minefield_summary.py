@@ -309,7 +309,7 @@ def calculate_statistics(data, output_folder='results'):
 
 
 def visualize_data(data, output_folder='results'):
-
+    data = data.copy()  # make a copy of the data to avoid modifying the original data`
     plt.figure(figsize=(10, 6))
     # filter rows where the acceptable column is empty
     data_accept_val = data[data['Acceptable'].notna()]
