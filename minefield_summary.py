@@ -201,6 +201,9 @@ def parse_table_in_chunk(chunk_text, model_name, model_url):
     # Clean column titles (strip leading and trailing whitespaces)
     df.columns = df.columns.str.strip()
 
+    # clean all cells containing strings (strip leading and trailing whitespaces)
+    df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+
     # Add Model, URL, and other necessary columns
     df['Model'] = model_name.strip()
     df['URL'] = model_url.strip()
