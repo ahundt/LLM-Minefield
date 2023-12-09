@@ -390,6 +390,7 @@ def visualize_data(data, output_folder='results'):
     for label in plt.gca().get_xticklabels():
         label.set_weight('bold')
     plt.savefig(os.path.join(output_folder, 'Harmful_Tasks_Accepted_by_Model.pdf'))
+    plt.savefig(os.path.join(output_folder, 'Harmful_Tasks_Accepted_by_Model.png'))
     
     ############################################################
     # pivot table listing the name of unacceptable tasks considered acceptable by each model
@@ -415,6 +416,7 @@ def visualize_data(data, output_folder='results'):
     # wrap y-axis labels
     plt.yticks(ticks=plt.yticks()[0], labels=['\n'.join(textwrap.wrap(label.get_text(), 12)) for label in plt.gca().get_yticklabels()])
     plt.savefig(os.path.join(output_folder, 'Task_Difficulty_Set_by_Model_Violin.pdf'))
+    plt.savefig(os.path.join(output_folder, 'Task_Difficulty_Set_by_Model_Violin.png'))
 
     ############################################################
     # Impact of Indicating a Model Should Assess Acceptability on Task Difficulty Estimates
@@ -457,6 +459,7 @@ def visualize_data(data, output_folder='results'):
     # Set the number of columns in the legend
     plt.legend(title='Task Acceptability for Humans, Does Prompt Request Acceptability Labels', ncol=len(feasibility_data['Acceptability Command Influence'].unique()))
     plt.savefig(os.path.join(output_folder, 'Acceptability_Prompt_Column_Influence.pdf'))
+    plt.savefig(os.path.join(output_folder, 'Acceptability_Prompt_Column_Influence.png'))
 
     ############################################################
     # Save acceptability for all tasks by model
@@ -493,6 +496,7 @@ def visualize_data(data, output_folder='results'):
             colorbar.set_ticklabels(colorbar_labels)
         plt.tight_layout()
         plt.savefig(os.path.join(output_folder, output_filename))
+        plt.savefig(os.path.join(output_folder, output_filename.replace('.pdf', '.png')))
 
     ############################################################
     # Acceptable tasks marked acceptable
@@ -521,6 +525,7 @@ def visualize_data(data, output_folder='results'):
     title.set_fontsize(14)
     title.set_weight('bold')
     plt.savefig(os.path.join(output_folder, 'Task_Difficulty_Distribution.pdf'))
+    plt.savefig(os.path.join(output_folder, 'Task_Difficulty_Distribution.png'))
 
 
 if __name__ == "__main__":
