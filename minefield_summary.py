@@ -363,30 +363,57 @@ def calculate_statistics(data, output_folder='results'):
 def visualize_data(data, output_folder='results'):
     data = data.copy()  # make a copy of the data to avoid modifying the original data`
     print(f'data.columns: {data.columns}')
+
+    ############################################################
+    # Countplot of Harmful tasks Accepted by each model
     plt.figure(figsize=(10, 6))
     # filter rows where the acceptable column is empty
     data_accept_val = data[data['Acceptable'].notna()]
     # Filter the data to contain only tasks that are unacceptable by human but considered acceptable by the model
     data_unacceptable = data_accept_val[(data_accept_val['Task Name'].apply(is_unacceptable)) & (data_accept_val['Acceptable'] == True)]
-    data_unacceptable.to_csv(os.path.join(output_folder, 'Unacceptable_Tasks_Accepted_by_Model.csv'), index=False)
+    data_unacceptable.to_csv(os.path.join(output_folder, 'Harmful_Tasks_Accepted_by_Model.csv'), index=False)
     # Countplot of unacceptable tasks considered acceptable by each model
-    sns.countplot(data=data_unacceptable, x='Model')
+    sns.countplot(data=data_unacceptable, x='Model', color='darkred')
     plt.xlabel('Model')
     plt.ylabel('Count')
-    plt.title('Unacceptable Tasks Considered Acceptable by Each Model')
-    plt.xticks(rotation=45)
+    title = plt.title('Harmful Tasks Marked Acceptable by Each Model')
+    title.set_fontsize(14)
+    title.set_weight('bold')
+    # only show the first word in each model name
+    plt.xticks(ticks=plt.xticks()[0], labels=[label.get_text().split(' ')[0] for label in plt.gca().get_xticklabels()])
+    # Add count numbers on top of each bar
+    for p in plt.gca().patches:
+        plt.text(p.get_x() + p.get_width() / 2., p.get_height(), '%d' % int(p.get_height()), 
+                fontsize=12, color='black', ha='center', va='bottom')
+    # plt.xticks(rotation=45)
     plt.tight_layout()
-    plt.savefig(os.path.join(output_folder, 'Unacceptable_Tasks_Accepted_by_Model.pdf'))
+    # make x-axis labels bold
+    for label in plt.gca().get_xticklabels():
+        label.set_weight('bold')
+    plt.savefig(os.path.join(output_folder, 'Harmful_Tasks_Accepted_by_Model.pdf'))
+    
+    ############################################################
     # pivot table listing the name of unacceptable tasks considered acceptable by each model
     pivot_table = data_unacceptable.pivot_table(index='Task Name', columns='Model', values='Acceptable', aggfunc='count')
-    pivot_table.to_csv(os.path.join(output_folder, 'Unacceptable_Tasks_Accepted_by_Model_Summary.csv'))
+    pivot_table.to_csv(os.path.join(output_folder, 'Harmful_Tasks_Accepted_by_Model.csv'))
 
+    ############################################################
+    # Countplot of acceptable tasks by each model
     plt.figure(figsize=(10, 6))
-    sns.countplot(data=data, x='Acceptability', hue='Task Difficulty')
-    plt.xlabel('Acceptability')
-    plt.ylabel('Count')
-    plt.title('Task Acceptability and Difficulty')
-    plt.legend(title='Task Difficulty')
+    # in data update Human Specified Acceptability to be a string
+    feasibility_data = data.copy()
+    feasibility_data['Human Specified Acceptability'] = feasibility_data['Human Specified Acceptability'].apply(map_acceptability_to_str)
+    sns.violinplot(data=feasibility_data, x='Model', y='Task Difficulty', hue='Human Specified Acceptability', dodge=True)
+    plt.xlabel('Model')
+    plt.ylabel('Model Specified Task Difficulty')
+    title = plt.title('Model Task Difficulty for Acceptable and Unacceptable Tasks')
+    title.set_fontsize(14)
+    title.set_weight('bold')
+    plt.legend(title='Human Specified Task Acceptability')
+    # only show the first word in each model name
+    plt.xticks(ticks=plt.xticks()[0], labels=[label.get_text().split(' ')[0] for label in plt.gca().get_xticklabels()])
+    # wrap y-axis labels
+    plt.yticks(ticks=plt.yticks()[0], labels=['\n'.join(textwrap.wrap(label.get_text(), 12)) for label in plt.gca().get_yticklabels()])
     plt.savefig(os.path.join(output_folder, 'Task_Acceptability_and_Difficulty.pdf'))
 
     ############################################################
@@ -396,7 +423,7 @@ def visualize_data(data, output_folder='results'):
 
     def create_heatmap(data, title, cmap, output_filename, vmax=1):
         plt.figure(figsize=(15, 20))
-        data.to_csv(output_filename.replace('.pdf', '.csv'))
+        data.to_csv(os.path.join(output_folder, output_filename.replace('.pdf', '.csv')))
         ax = sns.heatmap(pivot_table, cmap=cmap, annot=True, square=True, fmt='.1g', vmax=vmax)
         title = plt.title(title)
         title.set_fontsize(14)
@@ -407,16 +434,19 @@ def visualize_data(data, output_folder='results'):
         plt.yticks(plt.yticks()[0], [textwrap.fill(label.get_text(), 60) for label in plt.gca().get_yticklabels()])
         plt.savefig(os.path.join(output_folder, output_filename))
 
+    ############################################################
     # Acceptable tasks marked acceptable
     acceptable = data[data['Human Specified Acceptability'] == True]
     pivot_table = acceptable.pivot_table(index='Prompt Task Name', columns='Model', values='Acceptable', aggfunc=lambda x: sum(x == True))
     create_heatmap(pivot_table, 'Acceptable Tasks Marked Acceptable', 'Blues', 'Acceptable_Tasks_Marked_Acceptable.pdf')
 
+    ############################################################
     # Unacceptable tasks marked acceptable
     unacceptable = data[data['Human Specified Acceptability'] == False]
     pivot_table = unacceptable.pivot_table(index='Prompt Task Name', columns='Model', values='Acceptable', aggfunc=lambda x: sum(x == True))
     create_heatmap(pivot_table, 'Unacceptable Tasks Marked Acceptable', 'Reds', 'Unacceptable_Tasks_Marked_Acceptable.pdf')
 
+    ############################################################
     # Task Difficulty by Task
     pivot_table = data.pivot_table(index='Task Name', columns='Model', values='Difficult', aggfunc='mean') + 1 # we add 1 to 1 index the labels
     create_heatmap(pivot_table, 'Task Difficulty by Task', 'YlGnBu', 'Task_Difficulty_by_Task.pdf', vmax=max(pivot_table.max()))
@@ -425,7 +455,9 @@ def visualize_data(data, output_folder='results'):
     sns.countplot(data=data, x='Task Difficulty')
     plt.xlabel('Task Difficulty')
     plt.ylabel('Count')
-    plt.title('Task Difficulty Distribution')
+    title = plt.title('Task Difficulty Distribution')
+    title.set_fontsize(14)
+    title.set_weight('bold')
     plt.savefig(os.path.join(output_folder, 'Task_Difficulty_Distribution.pdf'))
 
 
