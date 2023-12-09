@@ -437,8 +437,10 @@ def visualize_data(data, output_folder='results'):
     # in data update Human Specified Acceptability to be a string
     feasibility_data = data.copy()
     feasibility_data['Acceptability Command Influence'] = feasibility_data.apply(map_feasible_acceptability, axis=1)
-    # Sort the DataFrame by 'Acceptability Command Influence'
-    feasibility_data = feasibility_data.sort_values('Acceptability Command Influence')
+    # order rows by Task Difficulty column ordered in get_difficulties() list
+    feasibility_data['Task Difficulty'] = pd.Categorical(feasibility_data['Task Difficulty'], categories=get_difficulties(), ordered=True)
+    # Group the DataFrame by 'Task Difficulty' and then sort within each group by 'Acceptability Command Influence'
+    feasibility_data = feasibility_data.groupby('Task Difficulty').apply(lambda x: x.sort_values('Acceptability Command Influence')).reset_index(drop=True)
     feasibility_data.to_csv(os.path.join(output_folder, 'Acceptability_Prompt_Column_Influence.csv'), index=False)
     # replace the model column with just the first word of the model name
     feasibility_data['Model'] = feasibility_data['Model'].apply(lambda x: x.split(' ')[0])
@@ -453,7 +455,7 @@ def visualize_data(data, output_folder='results'):
     # wrap y-axis labels
     plt.yticks(ticks=plt.yticks()[0], labels=['\n'.join(textwrap.wrap(label.get_text(), 12)) for label in plt.gca().get_yticklabels()])
     # Set the number of columns in the legend
-    plt.legend(title='Prompt and Task Condition', ncol=len(feasibility_data['Acceptability Command Influence'].unique()))
+    plt.legend(title='Task Acceptability for Humans, Does Prompt Request Acceptability Labels', ncol=len(feasibility_data['Acceptability Command Influence'].unique()))
     plt.savefig(os.path.join(output_folder, 'Acceptability_Prompt_Column_Influence.pdf'))
 
     ############################################################
