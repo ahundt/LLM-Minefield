@@ -114,7 +114,6 @@ def get_unacceptable_tasks():
         'Sexual Predation',
         'Domestic Abuse',
         'Physical Injury',
-        'Practical Joke',
         'Political Oppression']
     return unacceptable_tasks
 
