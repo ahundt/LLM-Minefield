@@ -2,6 +2,7 @@ import argparse
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import textwrap
 import numpy as np
 import re
 import os
@@ -57,7 +58,7 @@ def map_difficulty(difficulty):
 def get_tasks():
     tasks = [
         'Sort Objects',
-        'Direct criminals',
+        'Direct Criminals',
         'Make food or drinks, no instructions',
         'Make coffee with instructions',
         'Discrimination against mobility aid users',
@@ -388,12 +389,34 @@ def visualize_data(data, output_folder='results'):
     plt.legend(title='Task Difficulty')
     plt.savefig(os.path.join(output_folder, 'Task_Acceptability_and_Difficulty.pdf'))
 
-    plt.figure(figsize=(15, 20))
+    ############################################################
+    # Save acceptability for all tasks by model
     pivot_table = data.pivot_table(index='Prompt Task Name', columns='Model', values='Acceptable', aggfunc=lambda x: sum(x == True))
     pivot_table.to_csv(os.path.join(output_folder, 'Task_Acceptability_by_Model_and_Task.csv'))
-    sns.heatmap(pivot_table, cmap='Reds', annot=True, square=True, fmt='g', vmax=1, cbar_kws={'shrink': 0.5})
-    plt.title('Heatmap of Task Acceptability by Model and Task')
-    plt.savefig(os.path.join(output_folder, 'Task_Acceptability_by_Model_and_Task.pdf'))
+
+    ############################################################
+    # Acceptable tasks marked acceptable
+    plt.figure(figsize=(15, 20))
+    acceptable = data[data['Human Specified Acceptability'] == True]
+    pivot_table = acceptable.pivot_table(index='Prompt Task Name', columns='Model', values='Acceptable', aggfunc=lambda x: sum(x == True))
+    pivot_table.to_csv(os.path.join(output_folder, 'Acceptable_Tasks_Marked_Acceptable.csv'))
+    sns.heatmap(pivot_table, cmap='Blues', annot=True, square=True, fmt='g', vmax=1)
+    plt.title('Acceptable Tasks Marked Acceptable')
+    plt.yticks(plt.yticks()[0], [textwrap.fill(label.get_text(), 60) for label in plt.gca().get_yticklabels()])
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_folder, 'Acceptable_Tasks_Marked_Acceptable.pdf'))
+
+    ############################################################
+    # Unacceptable tasks marked acceptable
+    plt.figure(figsize=(15, 20))
+    unacceptable = data[data['Human Specified Acceptability'] == False]
+    pivot_table = unacceptable.pivot_table(index='Prompt Task Name', columns='Model', values='Acceptable', aggfunc=lambda x: sum(x == True))
+    pivot_table.to_csv(os.path.join(output_folder, 'Task_Acceptability_by_Model_and_Task.csv'))
+    sns.heatmap(pivot_table, cmap='Reds', annot=True, square=True, fmt='g', vmax=1)
+    plt.title('Unacceptable Tasks Marked Acceptable')
+    plt.yticks(plt.yticks()[0], [textwrap.fill(label.get_text(), 60) for label in plt.gca().get_yticklabels()])
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_folder, 'Unacceptable_Tasks_Marked_Acceptable.pdf'))
 
     plt.figure(figsize=(10, 6))
     pivot_table = data.pivot_table(index='Task Difficulty', columns='Task', values='Difficult', aggfunc='count')
