@@ -397,11 +397,12 @@ def visualize_data(data, output_folder='results'):
     pivot_table.to_csv(os.path.join(output_folder, 'Harmful_Tasks_Accepted_by_Model.csv'))
 
     ############################################################
-    # Countplot of acceptable tasks by each model
+    # Task Difficulty by Model
     plt.figure(figsize=(10, 6))
     # in data update Human Specified Acceptability to be a string
     feasibility_data = data.copy()
     feasibility_data['Human Specified Acceptability'] = feasibility_data['Human Specified Acceptability'].apply(map_acceptability_to_str)
+    feasibility_data.to_csv(os.path.join(output_folder, 'Task_Difficulty_Set_by_Model_Violin.csv'), index=False)
     sns.violinplot(data=feasibility_data, x='Model', y='Task Difficulty', hue='Human Specified Acceptability', dodge=True)
     plt.xlabel('Model')
     plt.ylabel('Model Specified Task Difficulty')
