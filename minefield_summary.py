@@ -417,6 +417,46 @@ def visualize_data(data, output_folder='results'):
     plt.savefig(os.path.join(output_folder, 'Task_Difficulty_Set_by_Model_Violin.pdf'))
 
     ############################################################
+    # Impact of Indicating a Model Should Assess Acceptability on Task Difficulty Estimates
+    def map_feasible_acceptability(row):
+        if row['Human Specified Acceptability'] and pd.isnull(row['Acceptable']):
+            return 'Acceptable for Humans,\nFeasibility Only'
+        elif not row['Human Specified Acceptability'] and pd.isnull(row['Acceptable']):
+            return 'Harmful for Humans,\nFeasibility Only'
+        elif row['Human Specified Acceptability']:
+            return 'Acceptable for Humans,\nModel Acceptability Enabled'
+        elif not row['Human Specified Acceptability']:
+            return 'Harmful for Humans,\nModel Acceptability Enabled'
+        else:
+            # print a warning and the value of human specified and row acceptability
+            print(f'Warning in map_feasible_acceptability: row["Human Specified Acceptability"]: {row["Human Specified Acceptability"]}, row["Acceptable"]: {row["Acceptable"]}')
+            return 'Other'
+
+    # Task Difficulty by Model
+    plt.figure(figsize=(14, 8))
+    # in data update Human Specified Acceptability to be a string
+    feasibility_data = data.copy()
+    feasibility_data['Acceptability Command Influence'] = feasibility_data.apply(map_feasible_acceptability, axis=1)
+    # Sort the DataFrame by 'Acceptability Command Influence'
+    feasibility_data = feasibility_data.sort_values('Acceptability Command Influence')
+    feasibility_data.to_csv(os.path.join(output_folder, 'Acceptability_Prompt_Column_Influence.csv'), index=False)
+    # replace the model column with just the first word of the model name
+    feasibility_data['Model'] = feasibility_data['Model'].apply(lambda x: x.split(' ')[0])
+    sns.violinplot(data=feasibility_data, x='Model', y='Task Difficulty', hue='Acceptability Command Influence', dodge=True, palette='coolwarm', saturation=1)
+    plt.xlabel('Model')
+    plt.ylabel('Model Specified Task Difficulty')
+    title = plt.title('Impact of Indicating a Model Should Assess Acceptability on Task Difficulty Estimates')
+    title.set_fontsize(14)
+    title.set_weight('bold')
+    # wrap x-axis labels at 30 characters
+    plt.xticks(ticks=plt.xticks()[0], labels=['\n'.join(textwrap.wrap(label.get_text(), 24)) for label in plt.gca().get_xticklabels()])
+    # wrap y-axis labels
+    plt.yticks(ticks=plt.yticks()[0], labels=['\n'.join(textwrap.wrap(label.get_text(), 12)) for label in plt.gca().get_yticklabels()])
+    # Set the number of columns in the legend
+    plt.legend(title='Prompt and Task Condition', ncol=len(feasibility_data['Acceptability Command Influence'].unique()))
+    plt.savefig(os.path.join(output_folder, 'Acceptability_Prompt_Column_Influence.pdf'))
+
+    ############################################################
     # Save acceptability for all tasks by model
     pivot_table = data.pivot_table(index='Prompt Task Name', columns='Model', values='Acceptable', aggfunc=lambda x: sum(x == True))
     pivot_table.to_csv(os.path.join(output_folder, 'Task_Acceptability_by_Model_and_Task.csv'))
