@@ -485,26 +485,37 @@ def visualize_data(data, output_folder='results'):
             else:
                 return 'False Negative\n(Robot Incorrectly Stopped)'
 
-    # Create the reorganized dataframe
-    model_performance_data = pd.DataFrame()
-    model_performance_data['Model'] = feasibility_data['Model'].unique()  # List of unique models
+    # categorize the prompts and add the column to the data
+    feasibility_data['Confusion Matrix'] = feasibility_data.apply(categorize_prompt, axis=1)
+    # sort rows by the confusion matrix column
+    feasibility_data = feasibility_data.sort_values('Confusion Matrix')
 
-    # Create columns for feasibility-only and feasibility-and-acceptability prompts
-    prompt_type = 'Feasibility'
-    df_filtered = feasibility_data[feasibility_data['Acceptability Command Influence'].str.contains(prompt_type)]
-    df_filtered[prompt_type] = df_filtered.apply(categorize_prompt, axis=1)
-    model_performance_data = pd.merge(model_performance_data, df_filtered[['Model', prompt_type]], on='Model', how='outer')
+    # create model_performance data, where rows where model, task name, and model response row index match,
+    # and the confusion matrix value is inserted into a Feasibility column when acceptability is empty,
+    # and a Feasibility and Acceptability column when acceptability is present
 
-    prompt_type = 'Feasibility and Acceptability'
-    df_filtered = feasibility_data[feasibility_data['Acceptability Command Influence'].str.contains('Acceptability')]
-    df_filtered[prompt_type] = df_filtered.apply(categorize_prompt, axis=1)
-    model_performance_data = pd.merge(model_performance_data, df_filtered[['Model', prompt_type]], on='Model', how='outer')
+    # Split feasibility_data into two DataFrames based on 'Acceptability'
+    feasibility_empty = feasibility_data[feasibility_data['Acceptability'].isna()]
+    feasability_acceptability = feasibility_data[feasibility_data['Acceptability'].notna()]
+
+    # Rename 'Confusion Matrix' column to 'Feasibility' and 'Feasibility and Acceptability'
+    feasibility_empty = feasibility_empty.rename(columns={'Confusion Matrix': 'Feasibility'})
+    feasability_acceptability = feasability_acceptability.rename(columns={'Confusion Matrix': 'Feasibility and Acceptability'})
+
+    model_performance_data = feasibility_empty
+
+    # insert the feasability_acceptability 'Feasibility and Acceptability' column 
+    # into the model_performance_data DataFrame
+    # on the row where model, task name, and model response row index match
+
+    # Merge the 'Feasibility and Acceptability' column from feasability_acceptability into model_performance_data
+    model_performance_data = pd.merge(model_performance_data, feasability_acceptability[['Model', 'Task Name', 'Model Response Row Index', 'Feasibility and Acceptability']], on=['Model', 'Task Name', 'Model Response Row Index'], how='left')
 
     # Create the parallel categories plot
     fig = px.parallel_categories(
         model_performance_data,
-        # dimensions=['Feasibility', 'Feasibility and Acceptability'],
-        dimensions=['Feasibility', 'Model', 'Feasibility and Acceptability'],
+        dimensions=['Feasibility', 'Feasibility and Acceptability'],
+        # dimensions=['Feasibility', 'Model', 'Feasibility and Acceptability'],
         color_continuous_scale="coolwarm",  # Or another suitable color scheme
         # line_shape="hspline"
     )
