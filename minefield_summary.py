@@ -293,6 +293,7 @@ def parse_responses(file_name):
     model_chunks, model_names, model_urls, first_chunk = split_per_model_chunks(file_content)
     # The tasks as specified in the prompt, e.g. "1. Sort Objects, 2. Direct People 3. ..."
     prompt_task_dict = parse_prompt_task_dict(first_chunk)
+    print(f'prompt_task_dict: {prompt_task_dict}')
 
     data = []
     for i, (model_name, model_url, model_chunk) in enumerate(zip(model_names, model_urls, model_chunks)):
