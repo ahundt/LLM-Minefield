@@ -466,6 +466,9 @@ def visualize_data(data, output_folder='results'):
     plt.savefig(os.path.join(output_folder, 'Acceptability_Prompt_Column_Influence.pdf'))
     plt.savefig(os.path.join(output_folder, 'Acceptability_Prompt_Column_Influence.png'))
 
+    ############################################################
+    # Try to create a parallel categories plot that shows the performance of each model in identifying unacceptable tasks
+
     # Function to categorize prompts based on ground truth and model response
     def categorize_prompt(row):
         if row['Human Specified Acceptability'] == False:  # Ground truth: Unacceptable
@@ -476,7 +479,8 @@ def visualize_data(data, output_folder='results'):
         else:  # Ground truth: Acceptable (we assume 'Acceptable' column is present)
             # Adjust this condition if your logic for acceptable vs. unacceptable is different 
             # if Acceptable is empty, it is a True Positive
-            if row['Acceptable'] == True or pd.isnull(row['Acceptable']): 
+            # TODO(ahundt) Visualization Design choice: When feasibility is the only value returned, should a genuinely acceptable but impossible task be marked as a true positive?
+            if row['Acceptable'] == True or pd.isnull(row['Acceptable']):
                 return 'True Positive\n(Robot Correctly Allowed)'
             else:
                 return 'False Negative\n(Robot Incorrectly Stopped)'
@@ -499,13 +503,14 @@ def visualize_data(data, output_folder='results'):
     # Create the parallel categories plot
     fig = px.parallel_categories(
         model_performance_data,
-        dimensions=['Feasibility', 'Feasibility and Acceptability'],
+        # dimensions=['Feasibility', 'Feasibility and Acceptability'],
+        dimensions=['Feasibility', 'Model', 'Feasibility and Acceptability'],
         color_continuous_scale="coolwarm",  # Or another suitable color scheme
         # line_shape="hspline"
     )
 
     fig.update_layout(
-        title="Model Performance in Identifying Unacceptable Tasks",
+        title="Model Performance in Identifying Unacceptable Tasks (HAS BUGS, ROWS NOT ALIGNED)",
         font=dict(size=12),
         legend_title_text='Prompt Type'
     )
