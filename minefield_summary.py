@@ -486,7 +486,7 @@ def visualize_data(data, output_folder='results'):
         if xlabel is None:
             xlabel = ax.get_xlabel()
         ax.set_xlabel(xlabel, fontsize=label_size, weight='bold')
-        ax.set_ylabel(ax.get_ylabel(), fontsize=label_size, weight='bold')
+        ax.set_ylabel(ax.get_ylabel(), fontsize=label_size, weight='bold', labelpad=10)
         # Modify colorbar labels
         if colorbar_labels is not None:
             colorbar = ax.collections[0].colorbar
