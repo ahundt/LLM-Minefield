@@ -481,7 +481,7 @@ def visualize_data(data, output_folder='results'):
             # if Acceptable is empty, it is a True Positive
             # TODO(ahundt) Visualization Design choice: When feasibility is the only value returned, should a genuinely acceptable but impossible task be marked as a true positive?
             if row['Acceptable'] == True or pd.isnull(row['Acceptable']):
-                return 'True Positive,<br>Robot<br>Correctly Acts'
+                return 'True Positive,<br>Robot<br>Correctly Attempts'
             else:
                 return 'False Negative,<br>Robot<br>Incorrectly Stopped'
 
@@ -516,14 +516,37 @@ def visualize_data(data, output_folder='results'):
     # model_performance_data['Model Color'] = model_performance_data['Model'].map(model_to_id)
 
     def create_parallel_categories_plot(data, title, output_name):
+        # # Calculate the percentages for 'Feasibility' and 'Feasibility and Acceptability'
+        # feasibility_percentages = data['Feasibility'].value_counts(normalize=True).sort_index()
+        # acceptability_percentages = data['Feasibility and Acceptability'].value_counts(normalize=True).sort_index()
+
+        # # Calculate the cumulative sums of the percentages
+        # feasibility_cumulative = feasibility_percentages.cumsum()
+        # acceptability_cumulative = acceptability_percentages.cumsum()
+
         # Create the parallel categories plot
         fig = px.parallel_categories(
             data,
             dimensions=['Feasibility', 'Feasibility and Acceptability'],
-            # color='Model Color',  # Use 'Model Color' column to determine line color
-            # color_continuous_scale="bluered",  # Or another suitable color scheme
-            # color_continuous_midpoint=data['Model Color'].mean()  # Set the midpoint of the color scale to the mean of 'Model Color'
         )
+
+        # # Add annotations for each category in 'Feasibility'
+        # for category, percentage in feasibility_percentages.items():
+        #     fig.add_annotation(
+        #         x=0,  # Adjust as needed
+        #         y=feasibility_cumulative[category] - (percentage / 2),  # Adjust as needed
+        #         text=f"{percentage * 100:.0f}%",
+        #         showarrow=False
+        #     )
+
+        # # Add annotations for each category in 'Feasibility and Acceptability'
+        # for category, percentage in acceptability_percentages.items():
+        #     fig.add_annotation(
+        #         x=1,  # Adjust as needed
+        #         y=acceptability_cumulative[category] - (percentage / 2),  # Adjust as needed
+        #         text=f"{percentage * 100:.0f}%",
+        #         showarrow=False
+        #     )
 
         fig.update_layout(
             title={
@@ -534,9 +557,19 @@ def visualize_data(data, output_folder='results'):
             font=dict(size=12),
             legend_title_text='Model'
         )
+        # Summarize the data for 'Feasibility'
+        feasibility_summary = data.groupby('Feasibility').size().reset_index(name='Feasibility Count')
+        feasibility_summary['Feasibility Percentage'] = ((feasibility_summary['Feasibility Count'] / feasibility_summary['Feasibility Count'].sum()) * 100).astype(int)
 
-        # Save the plots
-        data.to_csv(os.path.join(output_folder, f"{output_name}.csv"), index=False)
+        # Summarize the data for 'Feasibility and Acceptability'
+        acceptability_summary = data.groupby('Feasibility and Acceptability').size().reset_index(name='Feasability and Acceptability Count')
+        acceptability_summary['Feasibility and Acceptability Percentage'] = ((acceptability_summary['Feasability and Acceptability Count'] / acceptability_summary['Feasability and Acceptability Count'].sum()) * 100).astype(int)
+
+        # Concatenate the summaries
+        summary_data = pd.concat([feasibility_summary, acceptability_summary], axis=1)
+        
+        # Save the plots and the summarized data
+        summary_data.to_csv(os.path.join(output_folder, f"{output_name}.csv"), index=False)
         fig.write_image(os.path.join(output_folder, f"{output_name}.png"))
         fig.write_image(os.path.join(output_folder, f"{output_name}.pdf"))
 
