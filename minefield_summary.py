@@ -565,7 +565,8 @@ def visualize_data(data, output_folder='results'):
             },
             font=dict(
                 family="DejaVu Sans",  # Set the font to match matplotlib's default
-                size=12
+                size=12,
+                color="black"
             ),
             legend_title_text='Model'
         )
