@@ -367,8 +367,15 @@ def calculate_statistics(data, output_folder='results'):
 def visualize_data(data, output_folder='results'):
     data = data.copy()  # make a copy of the data to avoid modifying the original data`
     print(f'data.columns: {data.columns}')
-
+    # Trowaway figure to avoid mathjax errors that would appear in the final pdf
+    # Source: https://github.com/plotly/plotly.py/issues/3469#issuecomment-993565250
     ############################################################
+    figure=os.path.join(output_folder,"deleteme.pdf")
+    fig=px.scatter(x=[0, 1, 2, 3, 4], y=[0, 1, 4, 9, 16])
+    fig.write_image(figure, format="pdf")
+    # delete the file
+    os.remove(figure)
+
     # Countplot of Harmful tasks Accepted by each model
     plt.figure(figsize=(10, 6))
     # filter rows where the acceptable column is empty
