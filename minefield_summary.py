@@ -565,6 +565,7 @@ def visualize_data(data, output_folder='results'):
         #     )
 
         fig.update_layout(
+            autosize=True,
             title={
                 'text': title,
                 'x': 0.5,
@@ -575,7 +576,9 @@ def visualize_data(data, output_folder='results'):
                 size=12,
                 color="black"
             ),
-            legend_title_text='Model'
+            legend_title_text='Model',
+            width=400,
+            margin=dict(t=100, b=20)
         )
         # Summarize the data for 'Feasibility'
         feasibility_summary = data.groupby('Feasibility').size().reset_index(name='Feasibility Count')
@@ -594,7 +597,7 @@ def visualize_data(data, output_folder='results'):
         fig.write_image(os.path.join(output_folder, f"{output_name}.pdf"))
 
     # Create the overall plot
-    create_parallel_categories_plot(model_performance_data, "Aggregate Influence of Changing Prompt on Model Performance", "Acceptability_Prompt_Column_Influence_Parallel_Categories")
+    create_parallel_categories_plot(model_performance_data, "Aggregate Influence of Changing<br>Prompt on Model Performance", "Acceptability_Prompt_Column_Influence_Parallel_Categories")
 
     # Get the unique models
     models = model_performance_data['Model'].unique()
@@ -605,7 +608,7 @@ def visualize_data(data, output_folder='results'):
         model_data = model_performance_data[model_performance_data['Model'] == model]
 
         # Create the model-specific plot
-        create_parallel_categories_plot(model_data, f"Influence of Changing Prompt on {model} Performance", f"Acceptability_Prompt_Column_Influence_Parallel_Categories_{model}")
+        create_parallel_categories_plot(model_data, f"Influence of Changing<br>Prompt on {model} Performance", f"Acceptability_Prompt_Column_Influence_Parallel_Categories_{model}")
 
     ############################################################
     # Save acceptability for all tasks by model
