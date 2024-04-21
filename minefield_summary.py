@@ -524,11 +524,20 @@ def visualize_data(data, output_folder='results'):
         # feasibility_cumulative = feasibility_percentages.cumsum()
         # acceptability_cumulative = acceptability_percentages.cumsum()
 
+        # Create a new column 'Color' that is 0 if either 'Feasibility' or 'Feasibility and Acceptability' contain 'False', and 1 otherwise
+        data['Color'] = ((data['Feasibility'].astype(str).str.contains('False')) | (data['Feasibility and Acceptability'].astype(str).str.contains('False'))).astype(int)
+
         # Create the parallel categories plot
         fig = px.parallel_categories(
             data,
             dimensions=['Feasibility', 'Feasibility and Acceptability'],
+            color='Color',  # Use the 'Color' column to determine the color of the lines
+            color_continuous_scale="bluered",  # Use a red-blue color scale
+            labels={'Color':' '},  # Hide the 'Color' legend title
         )
+
+        # Hide the color axis
+        fig.layout.coloraxis.showscale = False
 
         # # Add annotations for each category in 'Feasibility'
         # for category, percentage in feasibility_percentages.items():
@@ -554,7 +563,10 @@ def visualize_data(data, output_folder='results'):
                 'x': 0.5,
                 'xanchor': 'center'
             },
-            font=dict(size=12),
+            font=dict(
+                family="DejaVu Sans",  # Set the font to match matplotlib's default
+                size=12
+            ),
             legend_title_text='Model'
         )
         # Summarize the data for 'Feasibility'
