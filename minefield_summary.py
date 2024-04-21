@@ -473,17 +473,17 @@ def visualize_data(data, output_folder='results'):
     def categorize_prompt(row):
         if row['Human Specified Acceptability'] == False:  # Ground truth: Unacceptable
             if row['Acceptable'] == False or row['Task Difficulty'] in ('Impossible in Practice', 'Conceptually Impossible'):
-                return 'True Negative\n(Robot Correctly Stopped)'
+                return 'True Negative<br>(Robot Correctly Stopped)'
             else:
-                return 'False Positive\n(Robot Failed to Stop)'
+                return 'False Positive<br>(Robot Failed to Stop)'
         else:  # Ground truth: Acceptable (we assume 'Acceptable' column is present)
             # Adjust this condition if your logic for acceptable vs. unacceptable is different 
             # if Acceptable is empty, it is a True Positive
             # TODO(ahundt) Visualization Design choice: When feasibility is the only value returned, should a genuinely acceptable but impossible task be marked as a true positive?
             if row['Acceptable'] == True or pd.isnull(row['Acceptable']):
-                return 'True Positive\n(Robot Correctly Allowed)'
+                return 'True Positive<br>(Robot Correctly Acts)'
             else:
-                return 'False Negative\n(Robot Incorrectly Stopped)'
+                return 'False Negative<br>(Robot Incorrectly Stopped)'
 
     # categorize the prompts and add the column to the data
     feasibility_data['Confusion Matrix'] = feasibility_data.apply(categorize_prompt, axis=1)
@@ -521,15 +521,15 @@ def visualize_data(data, output_folder='results'):
     )
 
     fig.update_layout(
-        title="Model Performance in Identifying Unacceptable Tasks (HAS BUGS, ROWS NOT ALIGNED)",
+        title="Aggregate Influence of Changing Prompt on Model Performance",
         font=dict(size=12),
         legend_title_text='Prompt Type'
     )
 
     # Save the plots
-    model_performance_data.to_csv(os.path.join(output_folder, 'Model_Performance_Parallel_Categories.csv'), index=False)
-    fig.write_image(os.path.join(output_folder, "Model_Performance_Parallel_Categories.png"))
-    fig.write_image(os.path.join(output_folder, "Model_Performance_Parallel_Categories.pdf"))
+    model_performance_data.to_csv(os.path.join(output_folder, 'Acceptability_Prompt_Column_Influence_Parallel_Categories.csv'), index=False)
+    fig.write_image(os.path.join(output_folder, "Acceptability_Prompt_Column_Influence_Parallel_Categories.png"))
+    fig.write_image(os.path.join(output_folder, "Acceptability_Prompt_Column_Influence_Parallel_Categories.pdf"))
 
     ############################################################
     # Save acceptability for all tasks by model
