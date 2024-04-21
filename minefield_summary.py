@@ -531,6 +531,31 @@ def visualize_data(data, output_folder='results'):
     fig.write_image(os.path.join(output_folder, "Acceptability_Prompt_Column_Influence_Parallel_Categories.png"))
     fig.write_image(os.path.join(output_folder, "Acceptability_Prompt_Column_Influence_Parallel_Categories.pdf"))
 
+    # Get the unique models
+    models = model_performance_data['Model'].unique()
+
+    # Loop over the models
+    for model in models:
+        # Filter the data for the current model
+        model_data = model_performance_data[model_performance_data['Model'] == model]
+
+        # Create the parallel categories plot
+        fig = px.parallel_categories(
+            model_data,
+            dimensions=['Feasibility', 'Feasibility and Acceptability'],
+            color_continuous_scale="coolwarm",  # Or another suitable color scheme
+        )
+
+        fig.update_layout(
+            title=f"Influence of Changing Prompt on {model} Performance",
+            font=dict(size=12),
+            legend_title_text='Prompt Type'
+        )
+
+        # Save the plots
+        fig.write_image(os.path.join(output_folder, f"Acceptability_Prompt_Column_Influence_Parallel_Categories_{model}.png"))
+        fig.write_image(os.path.join(output_folder, f"Acceptability_Prompt_Column_Influence_Parallel_Categories_{model}.pdf"))
+
     ############################################################
     # Save acceptability for all tasks by model
     pivot_table = data.pivot_table(index='Prompt Task Name', columns='Model', values='Acceptable', aggfunc=lambda x: sum(x == True))
