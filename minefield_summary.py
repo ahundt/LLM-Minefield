@@ -512,16 +512,17 @@ def visualize_data(data, output_folder='results'):
     model_performance_data = pd.merge(model_performance_data, feasability_acceptability[['Model', 'Task Name', 'Model Response Row Index', 'Feasibility and Acceptability']], on=['Model', 'Task Name', 'Model Response Row Index'], how='left')
 
     # Map all the unique models to values between 0 and 1 and add a column to the data
-    model_to_id = {model: i / (len(model_performance_data['Model'].unique()) - 1) for i, model in enumerate(model_performance_data['Model'].unique())}
-    model_performance_data['Model Color'] = model_performance_data['Model'].map(model_to_id)
+    # model_to_id = {model: i / (len(model_performance_data['Model'].unique()) - 1) for i, model in enumerate(model_performance_data['Model'].unique())}
+    # model_performance_data['Model Color'] = model_performance_data['Model'].map(model_to_id)
 
     def create_parallel_categories_plot(data, title, output_name):
         # Create the parallel categories plot
         fig = px.parallel_categories(
             data,
             dimensions=['Feasibility', 'Feasibility and Acceptability'],
-            color_continuous_scale="coolwarm",  # Or another suitable color scheme
-            # color=data['Model Color']
+            # color='Model Color',  # Use 'Model Color' column to determine line color
+            # color_continuous_scale="bluered",  # Or another suitable color scheme
+            # color_continuous_midpoint=data['Model Color'].mean()  # Set the midpoint of the color scale to the mean of 'Model Color'
         )
 
         fig.update_layout(
@@ -531,7 +532,7 @@ def visualize_data(data, output_folder='results'):
                 'xanchor': 'center'
             },
             font=dict(size=12),
-            legend_title_text='Prompt Type'
+            legend_title_text='Model'
         )
 
         # Save the plots
