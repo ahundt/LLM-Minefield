@@ -511,29 +511,36 @@ def visualize_data(data, output_folder='results'):
     # Merge the 'Feasibility and Acceptability' column from feasability_acceptability into model_performance_data
     model_performance_data = pd.merge(model_performance_data, feasability_acceptability[['Model', 'Task Name', 'Model Response Row Index', 'Feasibility and Acceptability']], on=['Model', 'Task Name', 'Model Response Row Index'], how='left')
 
-    # Create the parallel categories plot
-    fig = px.parallel_categories(
-        model_performance_data,
-        dimensions=['Feasibility', 'Feasibility and Acceptability'],
-        # dimensions=['Feasibility', 'Model', 'Feasibility and Acceptability'],
-        color_continuous_scale="coolwarm",  # Or another suitable color scheme
-        # line_shape="hspline"
-    )
+    # Map all the unique models to values between 0 and 1 and add a column to the data
+    model_to_id = {model: i / (len(model_performance_data['Model'].unique()) - 1) for i, model in enumerate(model_performance_data['Model'].unique())}
+    model_performance_data['Model Color'] = model_performance_data['Model'].map(model_to_id)
 
-    fig.update_layout(
-        title={
-            'text': "Aggregate Influence of Changing Prompt on Model Performance",
-            'x': 0.5,
-            'xanchor': 'center'
-        },
-        font=dict(size=12),
-        legend_title_text='Prompt Type'
-    )
+    def create_parallel_categories_plot(data, title, output_name):
+        # Create the parallel categories plot
+        fig = px.parallel_categories(
+            data,
+            dimensions=['Feasibility', 'Feasibility and Acceptability'],
+            color_continuous_scale="coolwarm",  # Or another suitable color scheme
+            # color=data['Model Color']
+        )
 
-    # Save the plots
-    model_performance_data.to_csv(os.path.join(output_folder, 'Acceptability_Prompt_Column_Influence_Parallel_Categories.csv'), index=False)
-    fig.write_image(os.path.join(output_folder, "Acceptability_Prompt_Column_Influence_Parallel_Categories.png"))
-    fig.write_image(os.path.join(output_folder, "Acceptability_Prompt_Column_Influence_Parallel_Categories.pdf"))
+        fig.update_layout(
+            title={
+                'text': title,
+                'x': 0.5,
+                'xanchor': 'center'
+            },
+            font=dict(size=12),
+            legend_title_text='Prompt Type'
+        )
+
+        # Save the plots
+        data.to_csv(os.path.join(output_folder, f"{output_name}.csv"), index=False)
+        fig.write_image(os.path.join(output_folder, f"{output_name}.png"))
+        fig.write_image(os.path.join(output_folder, f"{output_name}.pdf"))
+
+    # Create the overall plot
+    create_parallel_categories_plot(model_performance_data, "Aggregate Influence of Changing Prompt on Model Performance", "Acceptability_Prompt_Column_Influence_Parallel_Categories")
 
     # Get the unique models
     models = model_performance_data['Model'].unique()
@@ -543,26 +550,8 @@ def visualize_data(data, output_folder='results'):
         # Filter the data for the current model
         model_data = model_performance_data[model_performance_data['Model'] == model]
 
-        # Create the parallel categories plot
-        fig = px.parallel_categories(
-            model_data,
-            dimensions=['Feasibility', 'Feasibility and Acceptability'],
-            color_continuous_scale="coolwarm",  # Or another suitable color scheme
-        )
-
-        fig.update_layout(
-            title={
-                'text': f"Influence of Changing Prompt on {model} Performance",
-                'x': 0.5,
-                'xanchor': 'center'
-            },
-            font=dict(size=12),
-            legend_title_text='Prompt Type'
-        )
-
-        # Save the plots
-        fig.write_image(os.path.join(output_folder, f"Acceptability_Prompt_Column_Influence_Parallel_Categories_{model}.png"))
-        fig.write_image(os.path.join(output_folder, f"Acceptability_Prompt_Column_Influence_Parallel_Categories_{model}.pdf"))
+        # Create the model-specific plot
+        create_parallel_categories_plot(model_data, f"Influence of Changing Prompt on {model} Performance", f"Acceptability_Prompt_Column_Influence_Parallel_Categories_{model}")
 
     ############################################################
     # Save acceptability for all tasks by model
