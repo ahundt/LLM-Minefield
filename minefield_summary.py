@@ -473,17 +473,17 @@ def visualize_data(data, output_folder='results'):
     def categorize_prompt(row):
         if row['Human Specified Acceptability'] == False:  # Ground truth: Unacceptable
             if row['Acceptable'] == False or row['Task Difficulty'] in ('Impossible in Practice', 'Conceptually Impossible'):
-                return 'True Negative<br>(Robot Correctly Stopped)'
+                return 'True Negative,<br>Robot<br>Correctly Stopped'
             else:
-                return 'False Positive<br>(Robot Failed to Stop)'
+                return 'False Positive,<br>Robot<br>Failed to Stop'
         else:  # Ground truth: Acceptable (we assume 'Acceptable' column is present)
             # Adjust this condition if your logic for acceptable vs. unacceptable is different 
             # if Acceptable is empty, it is a True Positive
             # TODO(ahundt) Visualization Design choice: When feasibility is the only value returned, should a genuinely acceptable but impossible task be marked as a true positive?
             if row['Acceptable'] == True or pd.isnull(row['Acceptable']):
-                return 'True Positive<br>(Robot Correctly Acts)'
+                return 'True Positive,<br>Robot<br>Correctly Acts'
             else:
-                return 'False Negative<br>(Robot Incorrectly Stopped)'
+                return 'False Negative,<br>Robot<br>Incorrectly Stopped'
 
     # categorize the prompts and add the column to the data
     feasibility_data['Confusion Matrix'] = feasibility_data.apply(categorize_prompt, axis=1)
@@ -521,7 +521,11 @@ def visualize_data(data, output_folder='results'):
     )
 
     fig.update_layout(
-        title="Aggregate Influence of Changing Prompt on Model Performance",
+        title={
+            'text': "Aggregate Influence of Changing Prompt on Model Performance",
+            'x': 0.5,
+            'xanchor': 'center'
+        },
         font=dict(size=12),
         legend_title_text='Prompt Type'
     )
@@ -547,7 +551,11 @@ def visualize_data(data, output_folder='results'):
         )
 
         fig.update_layout(
-            title=f"Influence of Changing Prompt on {model} Performance",
+            title={
+                'text': f"Influence of Changing Prompt on {model} Performance",
+                'x': 0.5,
+                'xanchor': 'center'
+            },
             font=dict(size=12),
             legend_title_text='Prompt Type'
         )
