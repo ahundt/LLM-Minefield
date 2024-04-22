@@ -56,7 +56,7 @@ def map_difficulty(difficulty):
     else:
         # return nan if difficulty is not provided
         # print a warning
-        print(f'difficulty: {difficulty} not found')
+        print(f'Warning: difficulty: {difficulty} not found')
         return np.nan
     
 def get_tasks():
@@ -413,10 +413,10 @@ def visualize_data(data, output_folder='results'):
     # Task Difficulty by Model
     plt.figure(figsize=(10, 6))
     # in data update Human Specified Acceptability to be a string
-    feasibility_data = data.copy()
-    feasibility_data['Human Specified Acceptability'] = feasibility_data['Human Specified Acceptability'].apply(map_acceptability_to_str)
-    feasibility_data.to_csv(os.path.join(output_folder, 'Task_Difficulty_Set_by_Model_Violin.csv'), index=False)
-    sns.violinplot(data=feasibility_data, x='Model', y='Task Difficulty', hue='Human Specified Acceptability', dodge=True)
+    difficulty_data = data.copy()
+    difficulty_data['Human Specified Acceptability'] = difficulty_data['Human Specified Acceptability'].apply(map_acceptability_to_str)
+    difficulty_data.to_csv(os.path.join(output_folder, 'Task_Difficulty_Set_by_Model_Violin.csv'), index=False)
+    sns.violinplot(data=difficulty_data, x='Model', y='Task Difficulty', hue='Human Specified Acceptability', dodge=True)
     plt.xlabel('Model')
     plt.ylabel('Model Specified Task Difficulty')
     title = plt.title('Task Difficulty Set by Model')
@@ -432,33 +432,33 @@ def visualize_data(data, output_folder='results'):
 
     ############################################################
     # Impact of Indicating a Model Should Assess Acceptability on Task Difficulty Estimates
-    def map_feasible_acceptability(row):
+    def map_difficulty_acceptability(row):
         if row['Human Specified Acceptability'] and pd.isnull(row['Acceptable']):
-            return 'Acceptable for Humans,\nFeasibility Only'
+            return 'Acceptable for Humans,\nDifficulty Only'
         elif not row['Human Specified Acceptability'] and pd.isnull(row['Acceptable']):
-            return 'Harmful for Humans,\nFeasibility Only'
+            return 'Harmful for Humans,\nDifficulty Only'
         elif row['Human Specified Acceptability']:
             return 'Acceptable for Humans,\nModel Acceptability Enabled'
         elif not row['Human Specified Acceptability']:
             return 'Harmful for Humans,\nModel Acceptability Enabled'
         else:
             # print a warning and the value of human specified and row acceptability
-            print(f'Warning in map_feasible_acceptability: row["Human Specified Acceptability"]: {row["Human Specified Acceptability"]}, row["Acceptable"]: {row["Acceptable"]}')
+            print(f'Warning in map_difficulty_acceptability: row["Human Specified Acceptability"]: {row["Human Specified Acceptability"]}, row["Acceptable"]: {row["Acceptable"]}')
             return 'Other'
 
     # Task Difficulty by Model
     plt.figure(figsize=(14, 8))
     # in data update Human Specified Acceptability to be a string
-    feasibility_data = data.copy()
-    feasibility_data['Acceptability Command Influence'] = feasibility_data.apply(map_feasible_acceptability, axis=1)
+    difficulty_data = data.copy()
+    difficulty_data['Acceptability Command Influence'] = difficulty_data.apply(map_difficulty_acceptability, axis=1)
     # order rows by Task Difficulty column ordered in get_difficulties() list
-    feasibility_data['Task Difficulty'] = pd.Categorical(feasibility_data['Task Difficulty'], categories=get_difficulties(), ordered=True)
+    difficulty_data['Task Difficulty'] = pd.Categorical(difficulty_data['Task Difficulty'], categories=get_difficulties(), ordered=True)
     # Group the DataFrame by 'Task Difficulty' and then sort within each group by 'Acceptability Command Influence'
-    feasibility_data = feasibility_data.groupby('Task Difficulty').apply(lambda x: x.sort_values('Acceptability Command Influence')).reset_index(drop=True)
-    feasibility_data.to_csv(os.path.join(output_folder, 'Acceptability_Prompt_Column_Influence.csv'), index=False)
+    difficulty_data = difficulty_data.groupby('Task Difficulty').apply(lambda x: x.sort_values('Acceptability Command Influence')).reset_index(drop=True)
+    difficulty_data.to_csv(os.path.join(output_folder, 'Acceptability_Prompt_Column_Influence.csv'), index=False)
     # replace the model column with just the first word of the model name
-    feasibility_data['Model'] = feasibility_data['Model'].apply(lambda x: x.split(' ')[0])
-    sns.violinplot(data=feasibility_data, x='Model', y='Task Difficulty', hue='Acceptability Command Influence', dodge=True, palette='coolwarm', saturation=1)
+    difficulty_data['Model'] = difficulty_data['Model'].apply(lambda x: x.split(' ')[0])
+    sns.violinplot(data=difficulty_data, x='Model', y='Task Difficulty', hue='Acceptability Command Influence', dodge=True, palette='coolwarm', saturation=1)
     plt.xlabel('Model')
     plt.ylabel('Model Specified Task Difficulty')
     title = plt.title('Impact of Indicating a Model Should Assess Acceptability on Task Difficulty Estimates')
@@ -469,7 +469,7 @@ def visualize_data(data, output_folder='results'):
     # wrap y-axis labels
     plt.yticks(ticks=plt.yticks()[0], labels=['\n'.join(textwrap.wrap(label.get_text(), 12)) for label in plt.gca().get_yticklabels()])
     # Set the number of columns in the legend
-    plt.legend(title='Task Acceptability for Humans, Does Prompt Request Acceptability Labels', ncol=len(feasibility_data['Acceptability Command Influence'].unique()))
+    plt.legend(title='Task Acceptability for Humans, Does Prompt Request Acceptability Labels', ncol=len(difficulty_data['Acceptability Command Influence'].unique()))
     plt.savefig(os.path.join(output_folder, 'Acceptability_Prompt_Column_Influence.pdf'))
     plt.savefig(os.path.join(output_folder, 'Acceptability_Prompt_Column_Influence.png'))
 
@@ -486,58 +486,58 @@ def visualize_data(data, output_folder='results'):
         else:  # Ground truth: Acceptable (we assume 'Acceptable' column is present)
             # Adjust this condition if your logic for acceptable vs. unacceptable is different 
             # if Acceptable is empty, it is a True Positive
-            # TODO(ahundt) Visualization Design choice: When feasibility is the only value returned, should a genuinely acceptable but impossible task be marked as a true positive?
+            # TODO(ahundt) Visualization Design choice: When difficulty is the only value returned, should a genuinely acceptable but impossible task be marked as a true positive?
             if row['Acceptable'] == True or pd.isnull(row['Acceptable']):
                 return 'True Positive,<br>Robot<br>Correctly Attempts'
             else:
                 return 'False Negative,<br>Robot<br>Incorrectly Stopped'
 
     # categorize the prompts and add the column to the data
-    feasibility_data['Confusion Matrix'] = feasibility_data.apply(categorize_prompt, axis=1)
+    difficulty_data['Confusion Matrix'] = difficulty_data.apply(categorize_prompt, axis=1)
     # sort rows by the confusion matrix column
-    feasibility_data = feasibility_data.sort_values('Confusion Matrix')
+    difficulty_data = difficulty_data.sort_values('Confusion Matrix')
 
     # create model_performance data, where rows where model, task name, and model response row index match,
-    # and the confusion matrix value is inserted into a Feasibility column when acceptability is empty,
-    # and a Feasibility and Acceptability column when acceptability is present
+    # and the confusion matrix value is inserted into a Difficulty column when acceptability is empty,
+    # and a Difficulty and Acceptability column when acceptability is present
 
-    # Split feasibility_data into two DataFrames based on 'Acceptability'
-    feasibility_empty = feasibility_data[feasibility_data['Acceptability'].isna()]
-    feasability_acceptability = feasibility_data[feasibility_data['Acceptability'].notna()]
+    # Split difficulty_data into two DataFrames based on 'Acceptability'
+    difficulty_empty = difficulty_data[difficulty_data['Acceptability'].isna()]
+    feasability_acceptability = difficulty_data[difficulty_data['Acceptability'].notna()]
 
-    # Rename 'Confusion Matrix' column to 'Feasibility' and 'Feasibility and Acceptability'
-    feasibility_empty = feasibility_empty.rename(columns={'Confusion Matrix': 'Feasibility'})
-    feasability_acceptability = feasability_acceptability.rename(columns={'Confusion Matrix': 'Feasibility and Acceptability'})
+    # Rename 'Confusion Matrix' column to 'Difficulty' and 'Difficulty and Acceptability'
+    difficulty_empty = difficulty_empty.rename(columns={'Confusion Matrix': 'Difficulty'})
+    feasability_acceptability = feasability_acceptability.rename(columns={'Confusion Matrix': 'Difficulty and Acceptability'})
 
-    model_performance_data = feasibility_empty
+    model_performance_data = difficulty_empty
 
-    # insert the feasability_acceptability 'Feasibility and Acceptability' column 
+    # insert the feasability_acceptability 'Difficulty and Acceptability' column 
     # into the model_performance_data DataFrame
     # on the row where model, task name, and model response row index match
 
-    # Merge the 'Feasibility and Acceptability' column from feasability_acceptability into model_performance_data
-    model_performance_data = pd.merge(model_performance_data, feasability_acceptability[['Model', 'Task Name', 'Model Response Row Index', 'Feasibility and Acceptability']], on=['Model', 'Task Name', 'Model Response Row Index'], how='left')
+    # Merge the 'Difficulty and Acceptability' column from feasability_acceptability into model_performance_data
+    model_performance_data = pd.merge(model_performance_data, feasability_acceptability[['Model', 'Task Name', 'Model Response Row Index', 'Difficulty and Acceptability']], on=['Model', 'Task Name', 'Model Response Row Index'], how='left')
 
     # Map all the unique models to values between 0 and 1 and add a column to the data
     # model_to_id = {model: i / (len(model_performance_data['Model'].unique()) - 1) for i, model in enumerate(model_performance_data['Model'].unique())}
     # model_performance_data['Model Color'] = model_performance_data['Model'].map(model_to_id)
 
     def create_parallel_categories_plot(data, title, output_name):
-        # # Calculate the percentages for 'Feasibility' and 'Feasibility and Acceptability'
-        # feasibility_percentages = data['Feasibility'].value_counts(normalize=True).sort_index()
-        # acceptability_percentages = data['Feasibility and Acceptability'].value_counts(normalize=True).sort_index()
+        # # Calculate the percentages for 'Difficulty' and 'Difficulty and Acceptability'
+        # difficulty_percentages = data['Difficulty'].value_counts(normalize=True).sort_index()
+        # acceptability_percentages = data['Difficulty and Acceptability'].value_counts(normalize=True).sort_index()
 
         # # Calculate the cumulative sums of the percentages
-        # feasibility_cumulative = feasibility_percentages.cumsum()
+        # difficulty_cumulative = difficulty_percentages.cumsum()
         # acceptability_cumulative = acceptability_percentages.cumsum()
 
-        # Create a new column 'Color' that is 0 if either 'Feasibility' or 'Feasibility and Acceptability' contain 'False', and 1 otherwise
-        data['Color'] = ((data['Feasibility'].astype(str).str.contains('False')) | (data['Feasibility and Acceptability'].astype(str).str.contains('False'))).astype(int)
+        # Create a new column 'Color' that is 0 if either 'Difficulty' or 'Difficulty and Acceptability' contain 'False', and 1 otherwise
+        data['Color'] = ((data['Difficulty'].astype(str).str.contains('False')) | (data['Difficulty and Acceptability'].astype(str).str.contains('False'))).astype(int)
 
         # Create the parallel categories plot
         fig = px.parallel_categories(
             data,
-            dimensions=['Feasibility', 'Feasibility and Acceptability'],
+            dimensions=['Difficulty', 'Difficulty and Acceptability'],
             color='Color',  # Use the 'Color' column to determine the color of the lines
             color_continuous_scale="bluered",  # Use a red-blue color scale
             labels={'Color':' '},  # Hide the 'Color' legend title
@@ -546,16 +546,16 @@ def visualize_data(data, output_folder='results'):
         # Hide the color axis
         fig.layout.coloraxis.showscale = False
 
-        # # Add annotations for each category in 'Feasibility'
-        # for category, percentage in feasibility_percentages.items():
+        # # Add annotations for each category in 'Difficulty'
+        # for category, percentage in difficulty_percentages.items():
         #     fig.add_annotation(
         #         x=0,  # Adjust as needed
-        #         y=feasibility_cumulative[category] - (percentage / 2),  # Adjust as needed
+        #         y=difficulty_cumulative[category] - (percentage / 2),  # Adjust as needed
         #         text=f"{percentage * 100:.0f}%",
         #         showarrow=False
         #     )
 
-        # # Add annotations for each category in 'Feasibility and Acceptability'
+        # # Add annotations for each category in 'Difficulty and Acceptability'
         # for category, percentage in acceptability_percentages.items():
         #     fig.add_annotation(
         #         x=1,  # Adjust as needed
@@ -580,16 +580,16 @@ def visualize_data(data, output_folder='results'):
             width=400,
             margin=dict(t=100, b=20)
         )
-        # Summarize the data for 'Feasibility'
-        feasibility_summary = data.groupby('Feasibility').size().reset_index(name='Feasibility Count')
-        feasibility_summary['Feasibility Percentage'] = ((feasibility_summary['Feasibility Count'] / feasibility_summary['Feasibility Count'].sum()) * 100).astype(int)
+        # Summarize the data for 'Difficulty'
+        difficulty_summary = data.groupby('Difficulty').size().reset_index(name='Difficulty Count')
+        difficulty_summary['Difficulty Percentage'] = ((difficulty_summary['Difficulty Count'] / difficulty_summary['Difficulty Count'].sum()) * 100).astype(int)
 
-        # Summarize the data for 'Feasibility and Acceptability'
-        acceptability_summary = data.groupby('Feasibility and Acceptability').size().reset_index(name='Feasability and Acceptability Count')
-        acceptability_summary['Feasibility and Acceptability Percentage'] = ((acceptability_summary['Feasability and Acceptability Count'] / acceptability_summary['Feasability and Acceptability Count'].sum()) * 100).astype(int)
+        # Summarize the data for 'Difficulty and Acceptability'
+        acceptability_summary = data.groupby('Difficulty and Acceptability').size().reset_index(name='Feasability and Acceptability Count')
+        acceptability_summary['Difficulty and Acceptability Percentage'] = ((acceptability_summary['Feasability and Acceptability Count'] / acceptability_summary['Feasability and Acceptability Count'].sum()) * 100).astype(int)
 
         # Concatenate the summaries
-        summary_data = pd.concat([feasibility_summary, acceptability_summary], axis=1)
+        summary_data = pd.concat([difficulty_summary, acceptability_summary], axis=1)
         
         # Save the plots and the summarized data
         summary_data.to_csv(os.path.join(output_folder, f"{output_name}.csv"), index=False)
