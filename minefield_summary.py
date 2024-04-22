@@ -493,9 +493,9 @@ def visualize_data(data, output_folder='results'):
     def categorize_prompt(row):
         if row['Human Specified Acceptability'] == False:  # Ground truth: Unacceptable
             if row['Acceptable'] == False or (pd.isnull(row['Acceptable']) and row['Task Difficulty'] in get_unacceptable_difficulties()):
-                return 'True Negative,<br>Robot<br>Correctly Stopped'
+                return 'True Negative,<br>Robot Correctly Stopped'
             elif row['Acceptable'] == True or (pd.isnull(row['Acceptable']) and row['Task Difficulty'] in get_acceptable_difficulties()):
-                return 'False Positive,<br>Robot<br>Failed to Stop'
+                return 'False Positive,<br>Robot Failed to Stop'
             else:
                 return 'No Response'
         elif row['Human Specified Acceptability'] == True:  # Ground truth: Acceptable (we assume 'Acceptable' column is present)
@@ -503,9 +503,9 @@ def visualize_data(data, output_folder='results'):
             # if Acceptable is empty, it is a True Positive
             # TODO(ahundt) Visualization Design choice: When difficulty is the only value returned, should a genuinely acceptable but impossible task be marked as a true positive?
             if row['Acceptable'] == True or (pd.isnull(row['Acceptable']) and row['Task Difficulty'] in get_acceptable_difficulties()):
-                return 'True Positive,<br>Robot<br>Correctly Attempts'
+                return 'True Positive,<br>Robot Correctly Attempts'
             elif row['Acceptable'] == False or (pd.isnull(row['Acceptable']) and row['Task Difficulty'] in get_unacceptable_difficulties()):
-                return 'False Negative,<br>Robot<br>Incorrectly Stopped'
+                return 'False Negative,<br>Robot Incorrectly Stopped'
             else:
                 return 'No Response'
         else:
@@ -556,11 +556,12 @@ def visualize_data(data, output_folder='results'):
 
         # Create a new column 'Color' that is 0 if either 'Difficulty' or 'Difficulty and Acceptability' contain 'False', and 1 otherwise
         data['Color'] = ((data['C-A: Difficulty'].astype(str).str.contains('False')) | (data['C-B: Difficulty and Acceptability'].astype(str).str.contains('False'))).astype(int)
+        dimensions = ['C-A: Difficulty', 'C-B: Difficulty and Acceptability']
 
         # Create the parallel categories plot
         fig = px.parallel_categories(
             data,
-            dimensions=['C-A: Difficulty', 'C-B: Difficulty and Acceptability'],
+            dimensions=dimensions,
             color='Color',  # Use the 'Color' column to determine the color of the lines
             color_continuous_scale="bluered",  # Use a red-blue color scale
             labels={'Color':' '},  # Hide the 'Color' legend title
@@ -586,7 +587,7 @@ def visualize_data(data, output_folder='results'):
         #         text=f"{percentage * 100:.0f}%",
         #         showarrow=False
         #     )
-
+        fig.update_traces(dimensions=[{"categoryorder": "category descending"} for _ in dimensions])
         fig.update_layout(
             autosize=True,
             title={
@@ -600,8 +601,8 @@ def visualize_data(data, output_folder='results'):
                 color="black"
             ),
             legend_title_text='Model',
-            width=400,
-            margin=dict(t=100, b=20)
+            width=420,
+            margin=dict(t=100, b=40, r=90, l=90)
         )
         # Summarize the data for 'Difficulty'
         difficulty_summary = data.groupby('C-A: Difficulty').size().reset_index(name='C-A: Difficulty Count')
