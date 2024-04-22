@@ -549,15 +549,7 @@ def visualize_data(data, output_folder='results'):
     # model_to_id = {model: i / (len(model_performance_data['Model'].unique()) - 1) for i, model in enumerate(model_performance_data['Model'].unique())}
     # model_performance_data['Model Color'] = model_performance_data['Model'].map(model_to_id)
 
-    def create_parallel_categories_plot(data, title, output_name):
-        # # Calculate the percentages for 'Difficulty' and 'Difficulty and Acceptability'
-        # difficulty_percentages = data['Difficulty'].value_counts(normalize=True).sort_index()
-        # acceptability_percentages = data['Difficulty and Acceptability'].value_counts(normalize=True).sort_index()
-
-        # # Calculate the cumulative sums of the percentages
-        # difficulty_cumulative = difficulty_percentages.cumsum()
-        # acceptability_cumulative = acceptability_percentages.cumsum()
-
+    def create_parallel_categories_plot(data, title, output_name, show_values=False):
         # Create a new column 'Color' that is 0 if either 'Difficulty' or 'Difficulty and Acceptability' contain 'False', and 1 otherwise
         data['Color'] = ((data['C-A: Difficulty'].astype(str).str.contains('False')) | (data['C-B: Difficulty and Acceptability'].astype(str).str.contains('False'))).astype(int)
         dimensions = ['C-A: Difficulty', 'C-B: Difficulty and Acceptability']
@@ -574,23 +566,34 @@ def visualize_data(data, output_folder='results'):
         # Hide the color axis
         fig.layout.coloraxis.showscale = False
 
-        # # Add annotations for each category in 'Difficulty'
-        # for category, percentage in difficulty_percentages.items():
-        #     fig.add_annotation(
-        #         x=0,  # Adjust as needed
-        #         y=difficulty_cumulative[category] - (percentage / 2),  # Adjust as needed
-        #         text=f"{percentage * 100:.0f}%",
-        #         showarrow=False
-        #     )
+        if show_values:
+            # Show the percentages for each category
 
-        # # Add annotations for each category in 'Difficulty and Acceptability'
-        # for category, percentage in acceptability_percentages.items():
-        #     fig.add_annotation(
-        #         x=1,  # Adjust as needed
-        #         y=acceptability_cumulative[category] - (percentage / 2),  # Adjust as needed
-        #         text=f"{percentage * 100:.0f}%",
-        #         showarrow=False
-        #     )
+            # Calculate the percentages for 'Difficulty' and 'Difficulty and Acceptability'
+            difficulty_percentages = data['C-A: Difficulty'].value_counts(normalize=True).sort_index()
+            acceptability_percentages = data['C-B: Difficulty and Acceptability'].value_counts(normalize=True).sort_index()
+
+            # Calculate the cumulative sums of the percentages
+            difficulty_cumulative = difficulty_percentages.cumsum()
+            acceptability_cumulative = acceptability_percentages.cumsum()
+            # Add annotations for each category in 'Difficulty'
+            for category, percentage in difficulty_percentages.items():
+                fig.add_annotation(
+                    x=0.3,  # Adjust as needed
+                    y=difficulty_cumulative[category] - (percentage / 2),  # Adjust as needed
+                    text=f"{percentage * 100:.0f}%",
+                    showarrow=False
+                )
+
+            # Add annotations for each category in 'Difficulty and Acceptability'
+            for category, percentage in acceptability_percentages.items():
+                fig.add_annotation(
+                    x=0.7,  # Adjust as needed
+                    y=acceptability_cumulative[category] - (percentage / 2),  # Adjust as needed
+                    text=f"{percentage * 100:.0f}%",
+                    showarrow=False
+                )
+
         fig.update_traces(dimensions=[{"categoryorder": "category descending"} for _ in dimensions])
         fig.update_layout(
             autosize=True,
