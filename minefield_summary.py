@@ -646,14 +646,14 @@ def visualize_data(data, output_folder='results'):
     pivot_table = data.pivot_table(index='Prompt Task Name', columns='Model', values='Acceptable', aggfunc=lambda x: sum(x == True))
     pivot_table.to_csv(os.path.join(output_folder, 'Task_Acceptability_by_Model_and_Task.csv'))
 
-    def create_heatmap(df, title, cmap, output_filename, figsize=(10, 20), vmax=1, colorbar_labels=None, label_size=12, xlabel=''):
+    def create_heatmap(df, title, cmap, output_filename, figsize=(10, 20), vmax=1, colorbar_labels=None, label_size=12, xlabel='', textwrap_width=50):
         # Calculate the mean of each row and sort by it, so the highest value rows are at the top
         pivot_table = df.loc[df.mean(axis=1).sort_values(ascending=False).index]
         plt.figure(figsize=figsize)
         df.to_csv(os.path.join(output_folder, output_filename.replace('.pdf', '.csv')))
         ax = sns.heatmap(pivot_table, cmap=cmap, annot=True, square=True, fmt='.1g', vmax=vmax)
         title = plt.title(title)
-        title.set_fontsize(14)
+        title.set_fontsize(20)
         title.set_weight('bold')
         ax.xaxis.tick_top()
         ax.xaxis.set_label_position('top')
@@ -661,7 +661,7 @@ def visualize_data(data, output_folder='results'):
         ax.set_xticklabels([label.get_text().split(' ')[0] for label in ax.get_xticklabels()], fontsize=label_size, weight='bold')
         # Wrap x-axis labels after 4 characters
         ax.set_xticklabels(['\n'.join(textwrap.wrap(label.get_text(), 4)) for label in ax.get_xticklabels()], fontsize=label_size, weight='bold')
-        plt.yticks(plt.yticks()[0], [textwrap.fill(label.get_text(), 50) for label in plt.gca().get_yticklabels()], fontsize=label_size, weight='bold')
+        plt.yticks(plt.yticks()[0], [textwrap.fill(label.get_text(), textwrap_width) for label in plt.gca().get_yticklabels()], fontsize=label_size, weight='bold')
         if xlabel is None:
             xlabel = ax.get_xlabel()
         ax.set_xlabel(xlabel, fontsize=label_size, weight='bold')
@@ -673,7 +673,8 @@ def visualize_data(data, output_folder='results'):
             colorbar.set_ticks(tick_nums)
             # prepend number to labels with a space
             colorbar_labels = [f'{i:.1g}. {label}' for i, label in zip(tick_nums, colorbar_labels)]
-            colorbar.set_ticklabels(colorbar_labels)
+            # Set colorbar label size and apply text wrapping
+            colorbar.ax.set_yticklabels([textwrap.fill(label, textwrap_width) for label in colorbar_labels], fontsize=label_size)
         plt.tight_layout()
         plt.savefig(os.path.join(output_folder, output_filename))
         plt.savefig(os.path.join(output_folder, output_filename.replace('.pdf', '.png')))
@@ -692,8 +693,9 @@ def visualize_data(data, output_folder='results'):
 
     ############################################################
     # Task Difficulty by Task
-    pivot_table = data.pivot_table(index='Task Name', columns='Model', values='Difficult', aggfunc='mean') + 1 # we add 1 to 1 index the labels
-    create_heatmap(pivot_table, 'Task Difficulty Set by Model', 'YlGnBu', 'Task_Difficulty_Set_by_Model_Heatmap.pdf', figsize=(10,20), vmax=max(pivot_table.max()), colorbar_labels=get_difficulties())
+    pivot_table = data.pivot_table(index='Task Name', columns='Model', values='Difficult', aggfunc='min') + 1 # we add 1 to 1 index the labels
+    create_heatmap(pivot_table, 'Task Difficulty Set by Model', 'YlGnBu', 'Task_Difficulty_Set_by_Model_Heatmap.pdf', 
+                   figsize=(10,20), vmax=max(pivot_table.max()), colorbar_labels=get_difficulties(), label_size=16, textwrap_width=20)
 
     ############################################################
     # Task Difficulty Distribution
