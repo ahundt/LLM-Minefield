@@ -365,8 +365,8 @@ def calculate_statistics(data, output_folder='results'):
     print(f'data.columns: {data.columns}')
     stats = data.groupby(['Filename', 'Model', 'URL', 'Acceptability', 'Task Difficulty']).size().reset_index(name='Count')
     agg_stats = data.groupby(['Filename', 'Model', 'URL']).agg({
-        'Acceptable': ['count', 'min', 'max', 'median', lambda x: x.mode().iloc[0] if not x.mode().empty else None],
-        'Difficult': ['min', 'max', 'median', lambda x: x.mode().iloc[0] if not x.mode().empty else None]
+        'Acceptable': ['count', 'min', 'max', 'median', ('mode', lambda x: x.mode().iloc[0] if not x.mode().empty else None)],
+        'Difficult': ['min', 'max', 'median', ('mode', lambda x: x.mode().iloc[0] if not x.mode().empty else None)]
     }).reset_index()
     agg_stats.to_csv(os.path.join(output_folder,'aggregated_statistics.csv'), index=False)
 
