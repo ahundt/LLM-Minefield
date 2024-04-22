@@ -49,10 +49,10 @@ def map_difficulty(difficulty):
         return 3
     elif 'challenging' in difficulty:
         return 2
+    elif 'easy' in difficulty or 'easily' in difficulty:
+        return 0
     elif 'feasible' in difficulty:
         return 1
-    elif 'easy' in difficulty:
-        return 0
     else:
         # return nan if difficulty is not provided
         # print a warning
