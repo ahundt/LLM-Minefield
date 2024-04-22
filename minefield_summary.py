@@ -537,7 +537,11 @@ def visualize_data(data, output_folder='results'):
     # on the row where model, task name, and model response row index match
 
     # Merge the 'Difficulty and Acceptability' column from difficulty_acceptability into model_performance_data
-    model_performance_data = pd.merge(difficulty_empty, difficulty_acceptability[['Model', 'Task Name', 'Model Response Row Index', 'C-B: Difficulty and Acceptability', 'Acceptable', 'Acceptability']], on=['Model', 'Task Name', 'Model Response Row Index'], how='left')
+    model_performance_data = pd.merge(
+        difficulty_empty, 
+        difficulty_acceptability[['Model', 'Task Name', 'Model Response Row Index', 'C-B: Difficulty and Acceptability', 'Acceptable', 'Acceptability']], 
+        on=['Model', 'Task Name', 'Model Response Row Index'], how='left',
+        suffixes=('_C-A', '_C-B'))
 
     # save the model_performance_data to a csv file
     model_performance_data.to_csv(os.path.join(output_folder, 'Acceptability_Prompt_Column_Influence_Parallel_Categories_Merged.csv'), index=False)
