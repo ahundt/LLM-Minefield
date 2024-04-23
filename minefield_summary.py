@@ -674,6 +674,11 @@ def visualize_data(data, output_folder='results'):
     unacceptable = data[data['Human Specified Acceptability'] == False]
     pivot_table = unacceptable.pivot_table(index='Prompt Task Name', columns='Model', values='Acceptable', aggfunc=lambda x: sum(x == True))
     create_heatmap(pivot_table, 'Harmful Tasks Marked Acceptable', 'Reds', 'Harmful_Tasks_Marked_Acceptable.pdf')
+    # count the false positives for each model and save to a csv file
+    false_positive_count = pivot_table.sum()
+    # name the column 'False Positive Count'
+    false_positive_count.name = 'False Positive Count'
+    false_positive_count.to_csv(os.path.join(output_folder, 'Harmful_Tasks_Marked_Acceptable_False_Positive_Count.csv'))
 
     ############################################################
     # Task Difficulty by Task C-A
