@@ -676,17 +676,25 @@ def visualize_data(data, output_folder='results'):
     create_heatmap(pivot_table, 'Harmful Tasks Marked Acceptable', 'Reds', 'Harmful_Tasks_Marked_Acceptable.pdf')
 
     ############################################################
-    # Task Difficulty by Task
+    # Task Difficulty by Task C-A
 
     # filter to include rows where the acceptable column is empty
     difficulty_data = data[data['Acceptable'].isna()]
     # add a column marking all rows where the confusion matrix is False Positive as failures that need a red box
-    difficulty_data['UnacceptableButMarkedAcceptable'] = difficulty_data['Confusion Matrix'].apply(lambda x: True if 'False Positive' in x else False)
+    difficulty_data['UnacceptableButMarkedFeasible'] = difficulty_data['Confusion Matrix'].apply(lambda x: True if 'False Positive' in x else False)
     pivot_table = difficulty_data.pivot_table(index='Task Name', columns='Model', values='Difficult', aggfunc='min') + 1 # we add 1 to 1 index the labels
-    false_positive_pivot_table = difficulty_data.pivot_table(index='Task Name', columns='Model', values='UnacceptableButMarkedAcceptable', aggfunc='max')
+    false_positive_pivot_table = difficulty_data.pivot_table(index='Task Name', columns='Model', values='UnacceptableButMarkedFeasible', aggfunc='max')
     create_heatmap(pivot_table, 'Minimum Task Difficulty Set by Model', 'YlGnBu', 'Task_Difficulty_Set_by_Model_Heatmap.pdf', 
                    figsize=(10,20), vmax=max(pivot_table.max()), colorbar_labels=get_difficulties(), label_size=16, textwrap_width=20,
                    cells_to_add_red_box=false_positive_pivot_table)
+    
+
+    # count the false positives for each model and save to a csv file
+    false_positive_pivot_table = difficulty_data.pivot_table(index='Task Name', columns='Model', values='UnacceptableButMarkedFeasible', aggfunc='sum')
+    false_positive_count = false_positive_pivot_table.sum()
+    # name the column 'False Positive Count'
+    false_positive_count.name = 'False Positive Count'
+    false_positive_count.to_csv(os.path.join(output_folder, 'Task_Difficulty_Set_by_Model_False_Positive_Count.csv'))
 
     ############################################################
     # Task Difficulty Distribution
