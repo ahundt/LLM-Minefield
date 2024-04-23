@@ -645,7 +645,31 @@ def visualize_data(data, output_folder='results'):
         ax.set_xticklabels([label.get_text().split(' ')[0] for label in ax.get_xticklabels()], fontsize=label_size, weight='bold')
         # Wrap x-axis labels after 4 characters
         ax.set_xticklabels(['\n'.join(textwrap.wrap(label.get_text(), 4)) for label in ax.get_xticklabels()], fontsize=label_size, weight='bold')
-        plt.yticks(plt.yticks()[0], [textwrap.fill(label.get_text(), textwrap_width) for label in plt.gca().get_yticklabels()], fontsize=label_size, weight='bold')
+
+        ###
+        # Wrap y-axis labels after textwrap_width characters
+        # Get the current yticklabels
+        yticklabels = plt.gca().get_yticklabels()
+
+        # Initialize an empty list to store the new labels
+        new_labels = []
+
+        # Iterate over the yticklabels
+        for label in yticklabels:
+            text = label.get_text()
+            max_len = 4 * (textwrap_width - 3)
+            # Check if the length of the text is greater than three times textwrap_width
+            if len(text) > max_len:
+                # If it is, clip the text and add an ellipsis at the end
+                text = text[:max_len] + '...'
+            # Wrap the text and add it to the new labels
+            new_labels.append(textwrap.fill(text, textwrap_width))
+
+        # Set the new yticklabels
+        plt.yticks(plt.yticks()[0], new_labels, fontsize=label_size, weight='bold')
+
+        ###
+        # Set the x-axis label
         if xlabel is None:
             xlabel = ax.get_xlabel()
         ax.set_xlabel(xlabel, fontsize=label_size, weight='bold')
