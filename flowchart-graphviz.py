@@ -35,8 +35,10 @@ def categorize_prompt_confusion_matrix(row):
 dot = Digraph(comment='Confusion Matrix Flowchart')
 dot.attr(rankdir='LR', nodesep='0.2')
 # Set default attributes for all nodes and edges
-dot.attr('node', shape='rect', style='rounded', fontname='Arial', fontsize='12')
-dot.attr('edge', fontname='Arial', fontsize='10')
+dot.attr('node', shape='rect', style='rounded', fontname='Times-Roman', fontsize='12', penwidth='0.5')
+dot.attr('edge', fontname='Times-Roman', fontsize='10')
+
+dot.attr(label='Confusion Matrix Flowchart', labelloc='t', fontsize='24')
 
 # Decision nodes
 dot.node('start', 'Start', fillcolor='#CFCFC4', style='filled')  # pastel grey
@@ -50,9 +52,9 @@ dot.node('condition_a_hu', 'Model Assigned Difficulty?', fillcolor='#FEEBC8', st
 dot.node('condition_b_hu', 'Model Assigned Acceptability?', fillcolor='#D6BCFA', style='filled')  # pastel purple
 
 # Outcome nodes
-dot.node('true_negative', 'True Negative,\nRobot Correctly Stopped', fillcolor='#B3E6FF', style='filled')  # pastel blue
+dot.node('true_negative', 'True Negative,\nRobot Correctly Stopped', fillcolor='#B3E6FF', style='filled', shape='ellipse')  # pastel blue
 dot.node('false_positive', 'False Positive,\nRobot Failed to Stop', fillcolor='#FFB3B3', style='filled')  # pastel red
-dot.node('true_positive', 'True Positive,\nRobot Correctly Attempts', fillcolor='#B3E6FF', style='filled')  # pastel blue
+dot.node('true_positive', 'True Positive,\nRobot Correctly Attempts', fillcolor='#B3E6FF', style='filled', shape='ellipse')  # pastel blue
 dot.node('false_negative', 'False Negative,\nRobot Incorrectly Stopped', fillcolor='#FFB3B3', style='filled')  # pastel red
 
 # Create edges (arrows) representing the logic
@@ -107,4 +109,4 @@ dot.edge('condition_b_hu', 'false_positive', label='Acceptable', color='darkgree
 # dot.edge('true_positive', 'error')  
 
 # Render and save
-dot.render('confusion_matrix_flowchart.gv', view=True, format='pdf') 
+dot.render('confusion_matrix_flowchart', view=True, format='pdf') 
