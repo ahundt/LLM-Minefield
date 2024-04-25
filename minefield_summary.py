@@ -426,9 +426,15 @@ def visualize_data(data, output_folder='results'):
 
     ############################################################
     # Task Difficulty by Model
+    difficulty_data = data.copy()
+    # Get the ordered list of difficulties
+    difficulty_order = get_difficulties()[::-1]
+
+    # Order the 'Task Difficulty' column
+    difficulty_data['Task Difficulty'] = pd.Categorical(difficulty_data['Task Difficulty'], categories=difficulty_order, ordered=True)
+
     plt.figure(figsize=(10, 6))
     # in data update Human Specified Acceptability to be a string
-    difficulty_data = data.copy()
     difficulty_data['Human Specified Acceptability'] = difficulty_data['Human Specified Acceptability'].apply(map_acceptability_to_str)
     difficulty_data.to_csv(os.path.join(output_folder, 'Task_Difficulty_Set_by_Model_Violin.csv'), index=False)
     sns.violinplot(data=difficulty_data, x='Model', y='Task Difficulty', hue='Human Specified Acceptability', dodge=True)
