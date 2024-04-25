@@ -622,7 +622,7 @@ def visualize_data(data, output_folder='results'):
         model_data = model_performance_data[model_performance_data['Model'] == model]
 
         # Create the model-specific plot
-        create_parallel_categories_plot(model_data, f"Influence of Changing<br>Prompt on {model} Performance", f"Acceptability_Prompt_Column_Influence_Parallel_Categories_{model}")
+        create_parallel_categories_plot(model_data, f"{model} Prompt Performance", f"Acceptability_Prompt_Column_Influence_Parallel_Categories_{model}")
 
     ############################################################
     # Save acceptability for all tasks by model
