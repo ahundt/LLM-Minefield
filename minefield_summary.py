@@ -723,16 +723,16 @@ def visualize_data(data, output_folder='results'):
     # filter to include rows where the acceptable column is empty
     difficulty_data = data[data['Acceptable'].isna()]
     # add a column marking all rows where the confusion matrix is False Positive as failures that need a red box
-    difficulty_data['UnacceptableButMarkedFeasible'] = difficulty_data['Confusion Matrix'].apply(lambda x: True if 'False Positive' in x else False)
+    difficulty_data['Unacceptable But Marked Feasible'] = difficulty_data['Confusion Matrix'].apply(lambda x: True if 'False Positive' in x else False)
     pivot_table = difficulty_data.pivot_table(index='Task Name', columns='Model', values='Difficult', aggfunc='min') + 1 # we add 1 to 1 index the labels
-    false_positive_pivot_table = difficulty_data.pivot_table(index='Task Name', columns='Model', values='UnacceptableButMarkedFeasible', aggfunc='max')
+    false_positive_pivot_table = difficulty_data.pivot_table(index='Task Name', columns='Model', values='Unacceptable But Marked Feasible', aggfunc='max')
     create_heatmap(pivot_table, 'Minimum Task Difficulty Set by Model', 'YlGnBu', 'Task_Difficulty_Set_by_Model_Heatmap.pdf', 
                    figsize=(10,20), vmax=max(pivot_table.max()), colorbar_labels=get_difficulties(), label_size=16, textwrap_width=20,
                    cells_to_add_red_box=false_positive_pivot_table)
     
 
     # count the false positives for each model and save to a csv file
-    false_positive_pivot_table = difficulty_data.pivot_table(index='Task Name', columns='Model', values='UnacceptableButMarkedFeasible', aggfunc='sum')
+    false_positive_pivot_table = difficulty_data.pivot_table(index='Task Name', columns='Model', values='Unacceptable But Marked Feasible', aggfunc='sum')
     false_positive_count = false_positive_pivot_table.sum()
     # name the column 'False Positive Count'
     false_positive_count.name = 'False Positive Count'
@@ -748,9 +748,9 @@ def visualize_data(data, output_folder='results'):
     impossible_data = data[data['Task Name'].isin(impossible_tasks)]
 
     # Add a column 'Impossible Marked Impossible' that checks if 'Task Difficulty' contains 'impossible'
-    impossible_data['Impossible Marked Feasible'] = impossible_data['Task Difficulty'].apply(lambda x: True if 'feasible' in x.lower() else False)
+    impossible_data['Impossible But Marked Feasible'] = impossible_data['Task Difficulty'].apply(lambda x: True if 'feasible' in x.lower() else False)
     # Create a pivot table for the heatmap
-    pivot_table = impossible_data.pivot_table(index='Prompt Task Name', columns='Model', values='Impossible Marked Feasible', aggfunc=lambda x: sum(x == True))
+    pivot_table = impossible_data.pivot_table(index='Prompt Task Name', columns='Model', values='Impossible But Marked Feasible', aggfunc=lambda x: sum(x == True))
 
     # Create the heatmap
     # create_heatmap(pivot_table, 'Impossible Tasks Marked Feasible', 'YlGnBu', 'Impossible_Tasks_Marked_Feasible_Heatmap.pdf', 
@@ -758,7 +758,7 @@ def visualize_data(data, output_folder='results'):
     create_heatmap(pivot_table, 'Impossible Tasks\nMarked Feasible', 'Reds', 'Impossible_Tasks_Marked_Feasible_Heatmap.pdf', figsize=(9,7), cbar=False)
 
     impossible_marked_feasible_count = pivot_table.sum()
-    impossible_marked_feasible_count.name = 'Impossible Marked Feasible Count'
+    impossible_marked_feasible_count.name = 'Impossible But Marked Feasible Count'
     impossible_marked_feasible_count.to_csv(os.path.join(output_folder, 'Impossible_Tasks_Marked_Feasible_False_Positive_Count.csv'))
 
     ############################################################
