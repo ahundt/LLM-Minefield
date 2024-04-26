@@ -636,13 +636,13 @@ def visualize_data(data, output_folder='results'):
     pivot_table = data.pivot_table(index='Prompt Task Name', columns='Model', values='Acceptable', aggfunc=lambda x: sum(x == True))
     pivot_table.to_csv(os.path.join(output_folder, 'Task_Acceptability_by_Model_and_Task.csv'))
 
-    def create_heatmap(df, title, cmap, output_filename, figsize=(10, 20), vmax=1, colorbar_labels=None, label_size=12, xlabel='', textwrap_width=50, cells_to_add_red_box=None):
+    def create_heatmap(df, title, cmap, output_filename, figsize=(10, 20), vmax=1, colorbar_labels=None, label_size=12, xlabel='', textwrap_width=50, cells_to_add_red_box=None, cbar=True):
         # Calculate the mean of each row and sort by it, so the highest value rows are at the top
         how_to_sort = df.mean(axis=1).sort_values(ascending=False).index
         pivot_table = df.loc[how_to_sort]
         plt.figure(figsize=figsize)
         df.to_csv(os.path.join(output_folder, output_filename.replace('.pdf', '.csv')))
-        ax = sns.heatmap(pivot_table, cmap=cmap, annot=True, square=True, fmt='.1g', vmax=vmax)
+        ax = sns.heatmap(pivot_table, cmap=cmap, annot=True, square=True, fmt='.1g', vmax=vmax, cbar=cbar)
         # If false_positive_pivot_table is provided, add a red rectangle outline with a transparent center to the heatmap values where false_positive_pivot_table is True
         if cells_to_add_red_box is not None:
             cells_to_add_red_box = cells_to_add_red_box.loc[how_to_sort]
@@ -688,7 +688,7 @@ def visualize_data(data, output_folder='results'):
         ax.set_xlabel(xlabel, fontsize=label_size, weight='bold')
         ax.set_ylabel(ax.get_ylabel(), fontsize=label_size, weight='bold', labelpad=10)
         # Modify colorbar labels
-        if colorbar_labels is not None:
+        if cbar and colorbar_labels is not None:
             colorbar = ax.collections[0].colorbar
             tick_nums = np.linspace(1, vmax, len(colorbar_labels))
             colorbar.set_ticks(tick_nums)
@@ -748,14 +748,14 @@ def visualize_data(data, output_folder='results'):
     impossible_data = data[data['Task Name'].isin(impossible_tasks)]
 
     # Add a column 'Impossible Marked Impossible' that checks if 'Task Difficulty' contains 'impossible'
-    impossible_data['Impossible Marked Impossible'] = impossible_data['Task Difficulty'].apply(lambda x: True if 'impossible' in x.lower() else False)
+    impossible_data['Impossible Marked Feasible'] = impossible_data['Task Difficulty'].apply(lambda x: True if 'feasible' in x.lower() else False)
     # Create a pivot table for the heatmap
-    pivot_table = impossible_data.pivot_table(index='Task Name', columns='Model', values='Impossible Marked Impossible', aggfunc=lambda x: sum(x == True))
+    pivot_table = impossible_data.pivot_table(index='Prompt Task Name', columns='Model', values='Impossible Marked Feasible', aggfunc=lambda x: sum(x == True))
 
     # Create the heatmap
     # create_heatmap(pivot_table, 'Impossible Tasks Marked Feasible', 'YlGnBu', 'Impossible_Tasks_Marked_Feasible_Heatmap.pdf', 
     #                figsize=(10,20), vmax=max(pivot_table.max()), colorbar_labels=get_difficulties(), label_size=16, textwrap_width=20)
-    create_heatmap(pivot_table, 'Impossible Tasks Marked Feasible', 'Reds', 'Impossible_Tasks_Marked_Feasible_Heatmap.pdf')
+    create_heatmap(pivot_table, 'Impossible Tasks\nMarked Feasible', 'Reds', 'Impossible_Tasks_Marked_Feasible_Heatmap.pdf', figsize=(9,7), cbar=False)
 
     impossible_marked_feasible_count = pivot_table.sum()
     impossible_marked_feasible_count.name = 'Impossible Marked Feasible Count'
