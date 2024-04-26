@@ -438,6 +438,8 @@ def visualize_data(data, output_folder='results'):
     # Get the ordered list of difficulties
     difficulty_order = get_difficulties()[::-1]
 
+    # Sort the DataFrame by the 'Model' column
+    difficulty_data = difficulty_data.sort_values('Model')
     # Order the 'Task Difficulty' column
     difficulty_data['Task Difficulty'] = pd.Categorical(difficulty_data['Task Difficulty'], categories=difficulty_order, ordered=True)
 
