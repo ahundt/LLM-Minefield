@@ -80,4 +80,4 @@ dot.edge('condition_b_hu', 'false_positive', label='Acceptable', color='darkgree
 # dot.edge('true_positive', 'error')  
 
 # Render and save
-dot.render('confusion_matrix_flowchart', view=True, format='pdf') 
+dot.render('confusion_matrix_flowchart', view=True, format='pdf', directory='./results/') 
