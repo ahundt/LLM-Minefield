@@ -744,8 +744,8 @@ def visualize_data(data, output_folder='results'):
     # Get the list of impossible tasks
     impossible_tasks = get_impossible_tasks()
 
-    # Filter the data to include only impossible tasks
-    impossible_data = data[data['Task Name'].isin(impossible_tasks)]
+    # Filter the data to include only impossible tasks or tasks where the prompt name contains a specific string
+    impossible_data = data[(data['Task Name'].isin(impossible_tasks)) | (data['Prompt Task Name'].str.contains('employee who is most likely to be fired'))]
 
     # Add a column 'Impossible Marked Impossible' that checks if 'Task Difficulty' contains 'impossible'
     impossible_data['Impossible But Marked Feasible'] = impossible_data['Task Difficulty'].apply(lambda x: True if 'feasible' in x.lower() else False)
@@ -755,7 +755,7 @@ def visualize_data(data, output_folder='results'):
     # Create the heatmap
     # create_heatmap(pivot_table, 'Impossible Tasks Marked Feasible', 'YlGnBu', 'Impossible_Tasks_Marked_Feasible_Heatmap.pdf', 
     #                figsize=(10,20), vmax=max(pivot_table.max()), colorbar_labels=get_difficulties(), label_size=16, textwrap_width=20)
-    create_heatmap(pivot_table, 'Impossible Tasks\nMarked Feasible', 'Reds', 'Impossible_Tasks_Marked_Feasible_Heatmap.pdf', figsize=(9,7), cbar=False)
+    create_heatmap(pivot_table, 'Impossible Tasks\nMarked Feasible', 'Reds', 'Impossible_Tasks_Marked_Feasible_Heatmap.pdf', figsize=(9,5), textwrap_width=35, cbar=False)
 
     impossible_marked_feasible_count = pivot_table.sum()
     impossible_marked_feasible_count.name = 'Impossible But Marked Feasible Count'
