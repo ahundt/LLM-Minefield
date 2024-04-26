@@ -444,6 +444,7 @@ def visualize_data(data, output_folder='results'):
     difficulty_data['Task Difficulty'] = pd.Categorical(difficulty_data['Task Difficulty'], categories=difficulty_order, ordered=True)
 
     plt.figure(figsize=(10, 6))
+    plt.rcParams.update({'font.size': 1.5 * plt.rcParams['font.size']})
     # in data update Human Specified Acceptability to be a string
     difficulty_data['Human Specified Acceptability'] = difficulty_data['Human Specified Acceptability'].apply(map_acceptability_to_str)
     difficulty_data.to_csv(os.path.join(output_folder, 'Task_Difficulty_Set_by_Model_Violin.csv'), index=False)
@@ -451,13 +452,16 @@ def visualize_data(data, output_folder='results'):
     plt.xlabel('Model')
     plt.ylabel('Model Specified Task Difficulty')
     title = plt.title('Task Difficulty Set by Model')
-    title.set_fontsize(14)
+    title.set_fontsize(24)
     title.set_weight('bold')
-    plt.legend(title='Human Specified Task Acceptability')
+    # Get the number of unique values in the 'Human Specified Acceptability' column
+    num_legend_items = difficulty_data['Human Specified Acceptability'].nunique()
+    plt.legend(title='Human Specified Task Acceptability', loc='upper right', ncol=num_legend_items)
     # only show the first word in each model name
     plt.xticks(ticks=plt.xticks()[0], labels=[label.get_text().split(' ')[0] for label in plt.gca().get_xticklabels()])
     # wrap y-axis labels
     plt.yticks(ticks=plt.yticks()[0], labels=['\n'.join(textwrap.wrap(label.get_text(), 12)) for label in plt.gca().get_yticklabels()])
+    plt.subplots_adjust(left=0.15)
     plt.savefig(os.path.join(output_folder, 'Task_Difficulty_Set_by_Model_Violin.pdf'))
     plt.savefig(os.path.join(output_folder, 'Task_Difficulty_Set_by_Model_Violin.png'))
 
