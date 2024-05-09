@@ -448,7 +448,16 @@ def visualize_data(data, output_folder='results'):
     # in data update Human Specified Acceptability to be a string
     difficulty_data['Human Specified Acceptability'] = difficulty_data['Human Specified Acceptability'].apply(map_acceptability_to_str)
     difficulty_data.to_csv(os.path.join(output_folder, 'Task_Difficulty_Set_by_Model_Violin.csv'), index=False)
-    sns.violinplot(data=difficulty_data, x='Model', y='Task Difficulty', hue='Human Specified Acceptability', dodge=True)
+
+    # Get the current default color palette
+    current_palette = sns.color_palette()
+    # Select the bluish and reddish colors
+    blue = current_palette[0]
+    red = current_palette[3]
+    # Create a dictionary mapping 'Acceptable' to blue and 'Unacceptable' to red
+    palette = {'Acceptable': blue, 'Unacceptable': red}
+    # Create a violin plot of the task difficulty set by each model
+    sns.violinplot(data=difficulty_data, x='Model', y='Task Difficulty', hue='Human Specified Acceptability', dodge=True, palette=palette, split=True)
     plt.xlabel('Model')
     plt.ylabel('Model Specified Task Difficulty')
     title = plt.title('Task Difficulty Set by Model')
