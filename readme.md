@@ -2,6 +2,8 @@
 
 This Python script processes a folder of text files and markdown files, parses the responses, and generates a summary of the data in CSV format. It also provides options to drop certain rows, rename models, and visualize the data.
 
+For setup we suggest using [pyuvstarter](https://github.com/ahundt/pyuvstarter).
+
 ## Usage
 
 You can run the script from the command line with the following syntax:

@@ -2,3 +2,25 @@
 results/.DS_Store
 # Ignore the virtual environment directory
 llmrisks/
+
+# Added/Ensured by pyuvstarter.py
+
+# Python Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+*/.venv/
+*/venv/
+
+# Python Cache & Compiled Files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Log file from this script
+pyuvstarter_setup_log.json
+
+# OS-specific
+.DS_Store
+Thumbs.db
