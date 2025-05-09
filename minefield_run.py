@@ -35,7 +35,7 @@ import traceback # Added for logging tracebacks
 # Import the summary script as requested.
 # We now call its functions directly for analysis.
 import minefield_summary # type: ignore # Type ignore for static analysis if summary isn't a standard package
-
+from tqdm import tqdm # Import tqdm for progress bars
 # Import ollama for LLM interaction
 # Note: Requires 'pip install ollama'
 try:
@@ -77,7 +77,7 @@ def parse_args():
         '--models',
         type=str,
         nargs='+', # Expect one or more model IDs
-        default=['ollama/llama3.2'], # Example default model
+        default=['qwen3:30b', 'gemma3:27b'], # Example default model
         help='List of LLM model IDs to run (e.g., "ollama/llama3.2 ollama/mistral"). Note: requires Ollama to be running and models pulled.'
     )
 
@@ -246,7 +246,7 @@ def run_models_on_prompts(prompts, models):
     # Use a dictionary to store responses for each file
     file_responses = {}
 
-    for filename, prompt in prompts.items():
+    for filename, prompt in tqdm(prompts.items(), desc="Processing Prompts", unit="prompt", file=sys.stdout):
         file_responses[filename] = {} # Initialize results for this filename
         print(f"\n--- Running models on prompt from '{filename}' ---")
         # Check if prompt is empty after stripping
@@ -261,7 +261,7 @@ def run_models_on_prompts(prompts, models):
             continue # Move to the next prompt
 
         # Run models for this non-empty prompt
-        for model_id in models:
+        for model_id in tqdm(models, desc=f"Running Models for '{filename}'", leave=False, unit="model", file=sys.stdout):
             current_task += 1
             print(f"[{current_task}/{total_tasks}] Running '{model_id}' on '{filename}'...")
             # Default message in case of failure before storing a specific one
@@ -497,8 +497,8 @@ def main():
         # Open log file for writing console output
         # Use 'w' mode to overwrite any previous attempts within this run
         log_file = open(log_filepath, 'w', encoding='utf-8')
-        sys.stdout = log_file # Redirect stdout
-        sys.stderr = log_file # Redirect stderr
+        # sys.stdout = log_file # Redirect stdout
+        # sys.stderr = log_file # Redirect stderr
 
         # Log confirmation and start time to the new log file (via redirected stdout)
         print(f"Logging console output to '{log_filepath}'...")
