@@ -80,7 +80,7 @@ def parse_args():
         '--models',
         type=str,
         nargs='+', # Expect one or more model IDs
-        default=['ollama/llama3.2'], # Example default model
+        default=['qwen3:30b-32kctx'], # Example default model
         help='List of LLM model IDs to run (e.g., "ollama/llama3.2 ollama/mistral"). Note: requires Ollama to be running and models pulled.'
     )
 
