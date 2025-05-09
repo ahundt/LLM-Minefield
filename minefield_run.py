@@ -1,8 +1,10 @@
-# minefield_run.py - v3
+# Final Code: minefield_run.py - v4 (This is the complete code ready to use)
+# Incorporates direct calls to minefield_summary functions for analysis
+
 """
 Script to run multiple LLM models on prompts extracted from input files,
 save the combined outputs in a timestamped run folder, and then
-execute minefield_summary.py to analyze the results.
+execute minefield_summary.py's analysis logic by calling its functions.
 
 Arguments and console output are logged to the unique run folder.
 
@@ -12,6 +14,7 @@ Requirements:
 - An Ollama server running (default: http://localhost:11434)
 - The models specified via --models pulled in Ollama (e.g., `ollama pull llama3.2`)
 - minefield_summary.py located in the same directory as minefield_run.py
+- **All dependencies required by minefield_summary.py** (e.g., pandas, numpy, seaborn, matplotlib, plotly) must be installed in the **same Python environment** running minefield_run.py.
 - Input prompt files (.txt or .md) located in the --input_folder (default: 'responses')
   - These files should have the prompt content first, optionally followed by
     sections formatted like "Model Name (Model URL):" for existing outputs.
@@ -22,16 +25,16 @@ Requirements:
 import argparse
 import os
 import datetime
-import subprocess
 import re
 import json
 import sys # Added for console logging
-import builtins # Added for console logging (optional, kept for potential debug use)
+# builtins is useful for debugging if needed, but sys is sufficient for redirection
+import builtins # Added for console logging (optional, good for print before redirection)
 import traceback # Added for logging tracebacks
 
-# Import the summary script as requested, although it's run via subprocess
-# It is also used here for function reuse (split_per_model_chunks)
-import minefield_summary # type: ignore
+# Import the summary script as requested.
+# We now call its functions directly for analysis.
+import minefield_summary # type: ignore # Type ignore for static analysis if summary isn't a standard package
 
 # Import ollama for LLM interaction
 # Note: Requires 'pip install ollama'
@@ -39,18 +42,12 @@ try:
     import ollama
 except ImportError:
     # Print directly to original stderr in case logging fails later
-    print("Error: The 'ollama' library is not installed.", file=sys.stderr)
-    print("Please install it using: pip install ollama", file=sys.stderr)
+    builtins.print("Error: The 'ollama' library is not installed.", file=sys.stderr)
+    builtins.print("Please install it using: pip install ollama", file=sys.stderr)
     exit(1)
 
-# MODEL_SECTION_START_PATTERN is now primarily for documentation/understanding
+# MODEL_SECTION_START_PATTERN is primarily for documentation/understanding
 # as the actual splitting logic is reused from minefield_summary.
-# We keep it here as it was defined in v1, but note its reduced role.
-# Define the pattern used to identify the start of a model section in input files.
-# This pattern is derived from minefield_summary.split_per_model_chunks.
-# Everything *before* the first match of this pattern is considered the prompt (first chunk).
-# Keeping this defined here for clarity, although minefield_summary.split_per_model_chunks
-# relies on its own internal pattern definition.
 MODEL_SECTION_START_PATTERN = r"\n([^\n]+) \((https?://\S+)\):\s*\n"
 
 
@@ -80,16 +77,16 @@ def parse_args():
         '--models',
         type=str,
         nargs='+', # Expect one or more model IDs
-        default=['qwen3:30b-32kctx'], # Example default model
+        default=['ollama/llama3.2'], # Example default model
         help='List of LLM model IDs to run (e.g., "ollama/llama3.2 ollama/mistral"). Note: requires Ollama to be running and models pulled.'
     )
 
-    # Pass-through arguments for minefield_summary.py
+    # Pass-through arguments for minefield_summary.py's process_data
     # Keep default behavior consistent with minefield_summary.py defaults
     parser.add_argument(
         '--skip_descriptor_drop',
         action='store_true', # Store True if flag is present
-        help='(Passed to minefield_summary.py) Skip dropping specific descriptor rows.'
+        help='(Passed to minefield_summary.process_data) Skip dropping specific descriptor rows.'
     )
 
     # The rename_models argument is parsed as JSON directly.
@@ -98,7 +95,7 @@ def parse_args():
         '--rename_models',
         type=json.loads, # Use json.loads as the type directly
         default='{}', # Default is empty JSON string, which json.loads parses to {}
-        help='(Passed to minefield_summary.py) JSON string for renaming models (e.g., \'{"Bing": "CoPilot"}\').'
+        help='(Passed to minefield_summary.process_data) JSON string for renaming models (e.g., \'{"Bing": "CoPilot"}\').'
     )
 
     args = parser.parse_args()
@@ -112,12 +109,13 @@ def get_first_chunk(filepath):
     """
     Reads a file and returns the text content before the first model section,
     by reusing logic from minefield_summary.split_per_model_chunks.
+    Returns None on read or parse errors.
     """
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
     except Exception as e:
-        # This print will go to the current stderr (console or log file)
+        # Print to the current stderr (console or log file)
         print(f"Error reading file {filepath}: {e}", file=sys.stderr)
         return None
 
@@ -135,7 +133,7 @@ def get_first_chunk(filepath):
         # Handle potential errors within the summary's parsing function itself
         # This might happen if the file content is malformed in a way
         # the summary script's regex or splitting logic doesn't expect.
-        # This print will go to the current stderr (console or log file)
+        # Print to the current stderr (console or log file)
         print(f"Error parsing file content using minefield_summary logic for {filepath}: {e}", file=sys.stderr)
         # Returning None signals that this file could not be processed
         return None
@@ -151,7 +149,7 @@ def gather_prompts(input_folder):
     """
     prompts = {}
     if not os.path.isdir(input_folder):
-        # This print will go to the current stderr (console or log file)
+        # Print to the current stderr (console or log file)
         print(f"Error: Input folder not found or is not a directory: {input_folder}", file=sys.stderr)
         return prompts # Return empty dict on error
 
@@ -159,7 +157,7 @@ def gather_prompts(input_folder):
     files = [f for f in os.listdir(input_folder) if os.path.isfile(os.path.join(input_folder, f)) and (f.endswith('.txt') or f.endswith('.md'))]
 
     if not files:
-        # This print will go to the current stdout (console or log file)
+        # Print to the current stdout (console or log file)
         print(f"Warning: No .txt or .md files found in input folder: {input_folder}")
 
     for filename in files:
@@ -169,7 +167,7 @@ def gather_prompts(input_folder):
         if prompt is not None:
             # Use the base filename as the key
             prompts[filename] = prompt
-            # This print will go to the current stdout (console or log file)
+            # Print to the current stdout (console or log file)
             print(f"Gathered prompt from '{filename}'")
         else:
              # get_first_chunk already printed an error/warning if it failed
@@ -238,6 +236,7 @@ def run_models_on_prompts(prompts, models):
     # If no models are specified, populate results with skipped notes and return early
     if not models:
         print("No models specified to run.")
+        # Add a note to results for each prompt indicating models were skipped
         for filename in prompts:
              results[filename] = {model_id: "NOTE: No models specified to run." for model_id in models}
         return results
@@ -302,7 +301,7 @@ def save_combined_outputs(original_prompts, model_results, output_folder, models
     """
     Formats and saves the original prompt and each model's response into separate
     Markdown files in the specified output folder. Files are named after the
-    original input files.
+    original input files. These files serve as input for minefield_summary analysis.
 
     Args:
         original_prompts (dict): Dictionary of filename: original_prompt string.
@@ -382,101 +381,76 @@ def save_combined_outputs(original_prompts, model_results, output_folder, models
                 f.write(output_content)
             print(f"Saved combined output for '{filename}' to '{output_filepath}'")
         except Exception as e:
-            # This print will go to the current stderr (console or log file)
+            # Print to the current stderr (console or log file)
             print(f"Error writing output file {output_filepath}: {e}", file=sys.stderr)
 
     print("\nFinished saving all combined model outputs.")
 
 
-def run_summary_analysis(model_output_folder, model_analysis_folder, args):
+def perform_summary_analysis(model_output_folder, model_analysis_folder, args):
     """
-    Executes the minefield_summary.py script as a subprocess to analyze the model outputs.
+    Loads data from model outputs using minefield_summary.load_data,
+    processes it using minefield_summary.process_data, and saves
+    analysis results to the model_analysis_folder.
 
     Args:
-        model_output_folder (str): Path to the folder containing model outputs (input for summary script).
-        model_analysis_folder (str): Path to the folder for analysis results (output for summary script).
-        args (argparse.Namespace): Parsed command-line arguments from minefield_run.py.
+        model_output_folder (str): Path to the folder containing model outputs (input for summary logic).
+        model_analysis_folder (str): Path to the folder for analysis results (output for summary logic).
+        args (argparse.Namespace): Parsed command-line arguments from minefield_run.py,
+                                   containing pass-through args for process_data.
     """
     # This print will go to the current stdout (console or log file)
-    print(f"\n--- Running minefield_summary.py for analysis ---")
+    print(f"\n--- Performing summary analysis using minefield_summary functions ---")
 
-    # Ensure the analysis output folder exists before starting, even if summary fails.
+    # Ensure the analysis output folder exists before starting.
     os.makedirs(model_analysis_folder, exist_ok=True)
 
     # Check if there are files to analyze in the model output folder
-    # This ensures minefield_summary doesn't run on an empty input folder.
+    # This ensures minefield_summary.load_data doesn't run on an empty input folder
+    # and prevents subsequent errors in process_data if it expects input data.
     if not os.path.isdir(model_output_folder) or not os.listdir(model_output_folder):
         print(f"Warning: No model output files found in '{model_output_folder}' for analysis. Skipping summary analysis.")
         return # Exit if no files to process
 
-    # Construct the command to run minefield_summary.py
-    # Need to find the path to minefield_summary.py relative to the current script
-    # Or assume it's in the same directory or in the PATH.
-    # Assuming it's in the same directory for simplicity and robustness.
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    summary_script_path = os.path.join(script_dir, 'minefield_summary.py')
-
-    if not os.path.exists(summary_script_path):
-        # This print will go to the current stderr (console or log file)
-        print(f"Error: minefield_summary.py not found at expected path: {summary_script_path}", file=sys.stderr)
-        print("Please ensure minefield_summary.py is in the same directory as minefield_run.py.", file=sys.stderr)
-        print(f"Analysis folder '{model_analysis_folder}' will contain only the default files, if any were created before this error.", file=sys.stderr)
-        return # Cannot run if script is missing
-
-    command = [
-        sys.executable, # Use sys.executable to ensure the same python interpreter is used
-        summary_script_path,
-        '--input_folder', model_output_folder,
-        '--output_folder', model_analysis_folder
-    ]
-
-    # Add pass-through arguments if they were set
-    if args.skip_descriptor_drop:
-        command.append('--skip_descriptor_drop')
-
-    # The --rename_models argument for minefield_summary.py expects a JSON string.
-    # args.rename_models holds the parsed dictionary (thanks to type=json.loads).
-    # We need to convert this dictionary back into a JSON string to pass it on the command line.
-    # Only add the argument if the dictionary is not empty (i.e., not the default {}).
-    if args.rename_models: # Check if the dictionary is not empty
-       # Dump the dictionary back to a JSON string for the command line argument
-       rename_models_json_string = json.dumps(args.rename_models)
-       # Use a dedicated argument for the JSON string
-       command.extend(['--rename_models', rename_models_json_string])
-
-
-    print(f"Running command: {' '.join(command)}")
-
     try:
-        # Use capture_output=True and text=True to capture stdout/stderr as strings
-        # Then print them ourselves. check=True will raise CalledProcessError on non-zero exit code.
-        # We use run() which waits for the subprocess to complete (synchronous).
-        result = subprocess.run(command, check=True, capture_output=True, text=True)
-        print("--- minefield_summary.py Standard Output ---") # This output goes to our stdout (log file)
-        print(result.stdout)
-        if result.stderr:
-            # Print stderr to our redirected stderr (log file)
-            print("--- minefield_summary.py Standard Error ---", file=sys.stderr)
-            print(result.stderr, file=sys.stderr)
-        print("minefield_summary.py finished successfully.") # This output goes to our stdout (log file)
+        # Call minefield_summary.load_data directly.
+        # load_data expects just the input folder path.
+        print(f"Loading data from '{model_output_folder}' using minefield_summary.load_data...")
+        df = minefield_summary.load_data(model_output_folder)
 
-    except FileNotFoundError:
-        # This specifically catches if the 'python' executable is not found
-        print(f"Error: The '{sys.executable}' command was not found. Make sure Python is installed and in your PATH.", file=sys.stderr)
-        print(f"Analysis folder '{model_analysis_folder}' may be empty or incomplete.", file=sys.stderr)
-    except subprocess.CalledProcessError as e:
-        # This catches errors returned by minefield_summary.py itself (non-zero exit code)
-        print(f"Error: minefield_summary.py failed with exit code {e.returncode}", file=sys.stderr)
-        # Standard output still goes to our stdout (log file)
-        print("--- minefield_summary.py Standard Output ---")
-        print(e.stdout)
-        # Error output goes to our stderr (log file)
-        print("--- minefield_summary.py Standard Error ---", file=sys.stderr)
-        print(e.stderr, file=sys.stderr)
-        print(f"Analysis folder '{model_analysis_folder}' may contain incomplete results.", file=sys.stderr)
+        # Check if load_data returned a valid DataFrame
+        # load_data returns None or an empty DataFrame if no data is found/parsed.
+        if df is None or df.empty:
+            print(f"Warning: minefield_summary.load_data returned no data from '{model_output_folder}'. Skipping analysis processing.")
+            # Note: The analysis folder was already created above.
+            return # Exit if no data was loaded
+
+        print(f"Successfully loaded {len(df)} data points from {len(df['Filename'].unique())} files.")
+
+        # Call minefield_summary.process_data directly.
+        # process_data expects: df, output_folder, output_csv, skip_descriptor_drop, rename_models
+        # We need to provide appropriate values for these arguments.
+        # output_folder is the model_analysis_folder.
+        # output_csv is the name for the main summarized CSV file.
+        # skip_descriptor_drop and rename_models come from our parsed args.
+        analysis_output_csv_name = 'analysis_summary.csv' # Choose a name for the main CSV output
+
+        print(f"Processing data and generating analysis in '{model_analysis_folder}' using minefield_summary.process_data...")
+        minefield_summary.process_data(
+            df=df,
+            output_folder=model_analysis_folder, # Directory for all analysis outputs
+            output_csv=analysis_output_csv_name, # Specific name for the main CSV file
+            skip_descriptor_drop=args.skip_descriptor_drop, # Pass through boolean flag
+            rename_models=args.rename_models # Pass through the parsed dictionary
+        )
+
+        print("Summary analysis using minefield_summary functions finished successfully.")
+
     except Exception as e:
-        # Catch any other unexpected errors during subprocess execution
-        print(f"An unexpected error occurred while running minefield_summary.py: {e}", file=sys.stderr)
+        # Catch any exception that occurs during the direct calls to summary functions
+        # Print error and traceback to the redirected stderr (which is the log file)
+        print(f"\nError occurred during summary analysis using minefield_summary functions: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr) # Print traceback to log file
         print(f"Analysis folder '{model_analysis_folder}' may contain incomplete results.", file=sys.stderr)
 
 
@@ -490,31 +464,30 @@ def main():
     original_stderr = sys.stderr
 
     # Initial message before logging setup - goes to original console
-    # Using original_stdout/stderr explicitly in case print is rebound by an external library
-    print("Starting minefield_run process (v3)...", file=original_stdout)
+    # Using original_stdout/stderr explicitly or builtins.print for robustness
+    builtins.print("Starting minefield_run process (v4)...", file=original_stdout) # Use builtins.print for absolute certainty
 
     # 1. Parse arguments
     args = parse_args()
     # Print arguments *before* setting up logging, so they appear initially in the console
-    # Using original_stdout explicitly
-    print(f"Arguments parsed: {args}", file=original_stdout)
-
+    # Using original_stdout explicitly or builtins.print
+    builtins.print(f"Arguments parsed: {args}", file=original_stdout) # Use builtins.print
 
     # 2. Gather prompts from input folder
     # This might print warnings/errors about specific files to the original console
     original_prompts = gather_prompts(args.input_folder)
     if not original_prompts:
-        print("No valid prompts found. Exiting.", file=original_stderr)
+        builtins.print("No valid prompts found. Exiting.", file=original_stderr) # Use builtins.print
         return
 
     # 3. Create run folders
     # This might print messages about folder creation success or error to the original console
     run_folder, model_output_folder, model_analysis_folder = create_run_folders(args.output_base_folder)
     if run_folder is None: # Check if folder creation failed
-        print("Failed to create run folders. Exiting.", file=original_stderr)
+        builtins.print("Failed to create run folders. Exiting.", file=original_stderr) # Use builtins.print
         return
 
-    # --- START CHANGE 1 & 2 Combined ---
+    # --- Set up logging and save arguments ---
     # Now that we have the run_folder, set up logging and save arguments
     log_filepath = os.path.join(run_folder, 'run.log')
     args_filepath = os.path.join(run_folder, 'run_args.json')
@@ -522,58 +495,63 @@ def main():
     log_file = None # Initialize log_file handle
     try:
         # Open log file for writing console output
+        # Use 'w' mode to overwrite any previous attempts within this run
         log_file = open(log_filepath, 'w', encoding='utf-8')
         sys.stdout = log_file # Redirect stdout
         sys.stderr = log_file # Redirect stderr
 
-        # Log confirmation and start time to the new log file
+        # Log confirmation and start time to the new log file (via redirected stdout)
         print(f"Logging console output to '{log_filepath}'...")
         print(f"Run started at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
         # Save arguments to JSON file
         args_dict = {
+            # Convert Namespace attributes to dictionary entries
             'input_folder': args.input_folder,
             'output_base_folder': args.output_base_folder,
             'models': args.models, # Already a list
             'skip_descriptor_drop': args.skip_descriptor_drop,
-            'rename_models': args.rename_models # Already a dict
+            'rename_models': args.rename_models # Already a dict from json.loads
         }
         with open(args_filepath, 'w', encoding='utf-8') as f:
-            json.dump(args_dict, f, indent=4) # Use indent for readability
+            # Use sort_keys and indent for consistent and readable output
+            json.dump(args_dict, f, indent=4, sort_keys=True)
         print(f"Saved arguments to '{args_filepath}'") # This print goes to the log file
 
         # Repeat arguments in log file for completeness and easier debugging
-        print(f"Arguments parsed: {args}")
+        print(f"Arguments parsed (logged): {args_dict}") # Log the dict form
 
-        # --- START v3 Main Logic within logging context ---
+        # --- START v4 Main Logic within logging context ---
 
         # 4. Run models on gathered prompts
-        # These functions and subsequent ones will print to the log file
+        # These functions and subsequent ones will print to the log file via redirection
         model_results = run_models_on_prompts(original_prompts, args.models)
 
         # 5. Save combined outputs to the model_output folder
         save_combined_outputs(original_prompts, model_results, model_output_folder, args.models)
 
-        # 6. Run minefield_summary.py on the model_output folder
-        run_summary_analysis(model_output_folder, model_analysis_folder, args)
+        # 6. Perform summary analysis by calling minefield_summary functions directly
+        # This replaces the subprocess call from previous versions.
+        perform_summary_analysis(model_output_folder, model_analysis_folder, args)
 
-        print("\nMinefield run process finished (v3).") # This goes to the log file
-        # --- END v3 Main Logic ---
+        print("\nMinefield run process finished successfully (v4).") # This goes to the log file
 
     except Exception as e:
-        # Catch any exception that occurs *after* logging is set up
+        # Catch any exception that occurs *after* logging is set up (within the try block)
         # Print error and traceback to the redirected stderr (which is the log file)
         print(f"\nFATAL EXCEPTION occurred during run: {e}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr) # Print traceback to log file
-        # We could potentially exit here, but letting the 'finally' block run is safer for cleanup
+        # Note: We could potentially exit(1) here, but the 'finally' block is more important.
 
     finally:
         # --- Restore original stdout/stderr and close log file ---
         # Ensure streams are flushed before restoring
+        # This pushes any buffered output to the log file before we change where print goes.
         sys.stdout.flush()
         sys.stderr.flush()
 
         # Restore original streams
+        # Using builtins.print to be absolutely sure the restore message goes to the original console
         sys.stdout = original_stdout
         sys.stderr = original_stderr
 
@@ -583,11 +561,12 @@ def main():
                 log_file.close()
             except Exception as e:
                 # Print close errors to the original stderr
-                print(f"Error closing log file {log_filepath}: {e}", file=original_stderr)
+                builtins.print(f"Error closing log file {log_filepath}: {e}", file=original_stderr)
 
     # Final message after logging is restored - goes back to original console
     # This confirms the script finished, even if errors occurred before the final print in the log.
-    print("Minefield run process completed (check log file in run folder for full output).", file=original_stdout)
+    # Using builtins.print for absolute certainty.
+    builtins.print("Minefield run process completed (check log file in run folder for full output).", file=original_stdout)
 
 
 if __name__ == "__main__":
