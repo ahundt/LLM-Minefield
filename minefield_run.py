@@ -226,7 +226,7 @@ def run_models_on_prompts(prompts, models):
     results = {}
     total_prompts = len(prompts)
     total_models = len(models)
-    total_tasks = total_prompts * total_models # This count includes potential skips if prompt is empty
+    total_tasks = total_prompts * total_models  # This count includes potential skips if prompt is empty
     current_task = 0
 
     if not prompts:
@@ -238,63 +238,57 @@ def run_models_on_prompts(prompts, models):
         print("No models specified to run.")
         # Add a note to results for each prompt indicating models were skipped
         for filename in prompts:
-             results[filename] = {model_id: "NOTE: No models specified to run." for model_id in models}
+            results[filename] = {model_id: "NOTE: No models specified to run." for model_id in models}
         return results
 
     print(f"Starting model runs: {total_tasks} tasks ({total_prompts} prompts x {total_models} models)")
 
-    # Use a dictionary to store responses for each file
-    file_responses = {}
+    # Initialize results for all filenames
+    for filename in prompts:
+        results[filename] = {}
 
-    for filename, prompt in tqdm(prompts.items(), desc="Processing Prompts", unit="prompt", file=sys.stdout):
-        file_responses[filename] = {} # Initialize results for this filename
-        print(f"\n--- Running models on prompt from '{filename}' ---")
-        # Check if prompt is empty after stripping
-        if not prompt.strip():
-            print(f"Skipping model runs for '{filename}' due to empty prompt.")
-            # Store a note that models were skipped for this prompt
-            for model_id in models:
-                 file_responses[filename][model_id] = "NOTE: Skipped model run due to empty prompt."
-            # Increment task count for the skipped runs for accurate total/current display later
-            # This ensures the progress counter reaches total_tasks even if prompts are skipped.
-            current_task += len(models)
-            continue # Move to the next prompt
-
-        # Run models for this non-empty prompt
-        for model_id in tqdm(models, desc=f"Running Models for '{filename}'", leave=False, unit="model", file=sys.stdout):
+    # Outer loop: Iterate over models
+    for model_id in tqdm(models, desc="Processing Models", unit="model", file=sys.stderr):
+        # Inner loop: Iterate over prompts
+        for filename, prompt in tqdm(prompts.items(), desc=f"Running '{model_id}'", unit="prompt", leave=False, file=sys.stderr):
             current_task += 1
-            print(f"[{current_task}/{total_tasks}] Running '{model_id}' on '{filename}'...")
-            # Default message in case of failure before storing a specific one
-            response_text_on_failure = f"ERROR: Failed to get response from {model_id}. Check console/log for details."
+            tqdm.write(f"[{current_task}/{total_tasks}] Running '{model_id}' on '{filename}'...")
+
+            # Check if prompt is empty
+            if not prompt.strip():
+                tqdm.write(f"Skipping model runs for '{filename}' due to empty prompt.")
+                results[filename][model_id] = "NOTE: Skipped model run due to empty prompt."
+                continue
 
             try:
-                # ollama.chat expects a messages list
+                # Run the model on the prompt
                 response = ollama.chat(model=model_id, messages=[{'role': 'user', 'content': prompt}])
                 # Extract the content from the response dictionary
                 # Check the structure based on the ollama-python README example: response['message']['content']
                 response_text = response.get('message', {}).get('content', str(response))
-                if not response_text: # Handle empty content or unexpected response structure
-                     # Store an explicit message if model returned empty response
-                     response_text = f"Warning: Model '{model_id}' returned empty content for '{filename}'. Full response: {response}"
-                print(f"Successfully got response from '{model_id}'.")
-                file_responses[filename][model_id] = response_text # Store success or empty warning message
+                if not response_text:  # Handle empty content or unexpected response structure
+                    # Store an explicit message if model returned empty response
+                    response_text = f"Warning: Model '{model_id}' returned empty content for '{filename}'. Full response: {response}"
+                results[filename][model_id] = response_text  # Store success or empty warning message
+                tqdm.write(f"Successfully got response from '{model_id}' for '{filename}'.")
 
             except ollama.ResponseError as e:
                 # Specific error for API issues (e.g., model not found, invalid model)
-                print(f"Ollama Response Error running '{model_id}' on '{filename}': Status {e.status_code} - {e.error}", file=sys.stderr)
-                file_responses[filename][model_id] = f"ERROR: Ollama Response Error (Status {e.status_code}): {e.error}"
+                error_message = f"ERROR: Ollama Response Error (Status {e.status_code}): {e.error}"
+                results[filename][model_id] = error_message
+                tqdm.write(f"{error_message}")
+
             except Exception as e:
                 # Catch any other exceptions (e.g., connection errors, unexpected issues)
-                print(f"An unexpected error occurred running '{model_id}' on '{filename}': {e}", file=sys.stderr)
-                file_responses[filename][model_id] = f"ERROR: An unexpected error occurred: {e}"
-            # Store the error message/note in results so it appears in the output file
+                error_message = f"ERROR: An unexpected error occurred: {e}"
+                results[filename][model_id] = error_message
+                tqdm.write(f"{error_message}")
 
-
-    # After iterating through all prompts and models, the file_responses dictionary
+    # After iterating through all models and prompts, the results dictionary
     # contains the results/errors/notes for every requested model for every
     # successfully gathered prompt.
     print("\nFinished all model runs.")
-    return file_responses
+    return results
 
 
 def save_combined_outputs(original_prompts, model_results, output_folder, models_list):
