@@ -11,4 +11,5 @@ dependencies = [
     "pandas>=2.2.3",
     "plotly>=6.0.1",
     "seaborn>=0.13.2",
+    "tqdm"
 ]
