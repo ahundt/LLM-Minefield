@@ -208,6 +208,7 @@ def create_run_folders(output_base_folder, output_folder, resume, current_run_ti
         tuple: A tuple containing (run_folder, model_output_folder, model_analysis_folder, run_timestamp),
                or (None, None, None, None) if folder creation fails.
     """
+    os.makedirs(output_base_folder, exist_ok=True)
     run_folder = None
     run_timestamp = None
 
@@ -222,10 +223,15 @@ def create_run_folders(output_base_folder, output_folder, resume, current_run_ti
         sorted_folders = sorted(
             [folder for folder in os.listdir(output_base_folder) if os.path.isdir(os.path.join(output_base_folder, folder))]
         )
+        # if there are no folders, run_folder will be None
         run_folder = os.path.join(output_base_folder, sorted_folders[-1]) if sorted_folders else None
         if run_folder:
             match = re.search(r'run_(\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2})', run_folder)
             run_timestamp = match.group(1) if match else None
+        else:
+            print(f"Warning: No existing run folders found in '{output_base_folder}'. Creating a new one.", file=sys.stderr)
+            run_timestamp = current_run_timestamp
+            run_folder = os.path.join(output_base_folder, f"run_{run_timestamp}")
     else:
         # Create a new run folder with the current timestamp
         run_timestamp = current_run_timestamp
