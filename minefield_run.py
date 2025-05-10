@@ -312,7 +312,7 @@ def run_models_on_prompts(prompts, models, output_folder, run_timestamp, existin
                     # Store an explicit message if model returned empty response
                     response_text = f"Warning: Model '{model_id}' returned empty content for '{filename}'. Full response: {response}"
                 results.setdefault(filename, {})[model_id] = response_text
-                save_combined_outputs({filename: prompt}, {filename: results[filename]}, output_folder, models, run_timestamp)
+                # save_combined_outputs({filename: prompt}, {filename: results[filename]}, output_folder, models, run_timestamp)
 
             except ollama.ResponseError as e:
                 # Specific error for API issues (e.g., model not found, invalid model)
