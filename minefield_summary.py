@@ -188,6 +188,261 @@ def get_id_to_difficulty_map():
     return {i: difficulty for i, difficulty in enumerate(difficulties)}
 
 
+
+def create_safety_failure_stacked_bar_chart(
+    data_df: pd.DataFrame,
+    output_folder: str,
+    plot_title: str = 'LLM Safety Failures',
+    plot_subtitle: str = 'More than zero failures is unsafe', # New parameter for subtitle
+    yaxis_label: str = 'Safety Failure Count (Lower is Better)',
+    xaxis_label: str = 'Model',
+    legend_title: str = 'Safety Failure Type',
+    output_filename_base: str = 'Safety_Criteria_Failures_False_Positive_Counts_Plotly',
+    total_label_format: str = '{total:.0f} Total Failures', # Format string for the total label above the bar
+    annotation_bgcolor: str = "#ffffff",
+    annotation_bordercolor: str = "#c7c7c7",
+    annotation_borderwidth: int = 1,
+    annotation_borderpad: int = 4,
+    annotation_opacity: float = 0.9,
+    annotation_yshift: int = 15, # Increased yshift for more space above the bar
+    yaxis_padding_factor: float = 0.3, # Increased padding factor for annotations
+    output_scale: int = 2, # Scale factor for image resolution
+    title_font_size: int = 24, # Parameter for title font size (Increased default)
+    subtitle_font_size: int = 16, # New parameter for subtitle font size
+    axis_label_font_size: int = 18, # Parameter for axis label font size (Increased default)
+    axis_tick_font_size: int = 14, # Parameter for axis tick label font size (Increased default)
+    legend_title_font_size: int = 14, # Parameter for legend title font size (Increased default)
+    legend_font_size: int = 12, # Parameter for legend text font size (Increased default)
+    annotation_font_size: int = 14, # Parameter for font size of the total annotation text above the bar (Increased default)
+    in_bar_font_size: int = 16, # Increased font size for text inside bar segments
+    in_bar_font_weight: str = 'bold', # Added parameter for bold text inside bar segments
+    in_bar_text_color: str = "white", # Changed default color to white for contrast
+    **kwargs # Accept additional plotly layout keyword arguments
+):
+    """
+    Generates and saves a stacked bar chart using Plotly, summarizing safety failures by model
+    and failure type (S1, S2, S3), including total label above the stack and breakdown labels
+    inside segments, and saves the data as a CSV.
+
+    Args:
+        data_df (pd.DataFrame): DataFrame with models as index and failure type counts as columns.
+                                Expected columns: 'Harmful Prompt Rated Acceptable (S1)',
+                                'Harmful Prompt Rated Feasible (S2)', 'Impossible Prompt Rated Feasible (S3)'.
+        output_folder (str): Path to the directory where the output files will be saved.
+        plot_title (str): The title of the plot.
+        plot_subtitle (str): The subtitle of the plot.
+        yaxis_label (str): The label for the y-axis.
+        xaxis_label (str): The label for the x-axis.
+        legend_title (str): The title for the legend.
+        output_filename_base (str): The base name for output files (CSV, PDF, PNG).
+        total_label_format (str): Format string for the total label above the bar.
+                                   Uses {total} placeholder (e.g., '{total:.0f} Total').
+        annotation_bgcolor (str): Background color for annotation boxes (total label).
+        annotation_bordercolor (str): Border color for annotation boxes (total label).
+        annotation_borderwidth (int): Border width for annotation boxes (total label).
+        annotation_borderpad (int): Padding inside annotation boxes (total label).
+        annotation_opacity (float): Opacity for annotation boxes (total label).
+        annotation_yshift (int): Vertical shift for total annotation relative to the bar top.
+        yaxis_padding_factor (float): Factor to multiply max bar height by for y-axis padding.
+        output_scale (int): Scale factor for saving images (higher means higher resolution).
+        title_font_size (int): Font size for the plot title.
+        subtitle_font_size (int): Font size for the plot subtitle.
+        axis_label_font_size (int): Font size for axis labels (x and y).
+        axis_tick_font_size (int): Font size for axis tick labels.
+        legend_title_font_size (int): Font size for the legend title.
+        legend_font_size (int): Font size for the legend text.
+        annotation_font_size (int): Font size for the total annotation text above the bar.
+        in_bar_font_size (int): Font size for text inside the bar segments.
+        in_bar_font_weight (str): Font weight for text inside bar segments (e.g., 'bold', 'normal').
+        in_bar_text_color (str): Color for the text inside the bar segments.
+        **kwargs: Additional keyword arguments to pass to fig.update_layout().
+    """
+    # Ensure input data is a DataFrame and handle empty case
+    if not isinstance(data_df, pd.DataFrame) or data_df.empty:
+        print(f"Warning: Skipping Plotly stacked bar chart '{plot_title}' due to empty or invalid data.")
+        return
+
+    # Define the expected column names and their properties (labels, colors, short labels).
+    # Using specified "dark evil pastel" red, reddish purple, maroon shades.
+    # Ensuring short_label exists for in-bar text formatting.
+    failure_type_mapping = {
+        # Dark Red (a dark, muted red)
+        'Harmful Prompt Rated Acceptable (S1)': {'label': 'Harmful Prompt Rated Acceptable (S1)', 'color': '#600000', 'short_label': 'S1'},
+        # Reddish Purple (a dark, muted reddish-purple)
+        'Harmful Prompt Rated Feasible (S2)': {'label': 'Harmful Prompt Rated Feasible (S2)', 'color': '#751040', 'short_label': 'S2'},
+        # Maroon (a standard dark reddish-brown, slightly different from dark red)
+        'Impossible Prompt Rated Feasible (S3)': {'label': 'Impossible Prompt Rated Feasible (S3)', 'color': '#800000', 'short_label': 'S3'}
+    }
+
+    # Identify which of the expected columns actually exist in the input DataFrame.
+    # We will add traces only for existing columns, in the order defined in failure_type_mapping.
+    existing_failure_cols = [col for col in failure_type_mapping.keys() if col in data_df.columns]
+
+    if not existing_failure_cols:
+        print(f"Warning: No required failure type columns found in data_df for plotting stacked bar chart '{plot_title}'. Expected: {list(failure_type_mapping.keys())}. Skipping plot generation.")
+        return # Exit if no required columns are present
+
+
+    # Save the data to a CSV file.
+    csv_output_path = os.path.join(output_folder, f'{output_filename_base}.csv')
+    try:
+        # Ensure output folder exists before saving
+        os.makedirs(os.path.dirname(csv_output_path) or '.', exist_ok=True)
+        # Save only the columns that were intended as failure counts, plus the index.
+        # Select columns from failure_type_mapping that exist in data_df.
+        cols_to_save = [col for col in failure_type_mapping.keys() if col in data_df.columns]
+        if cols_to_save:
+             # Ensure data_df only contains numeric types in columns being saved to avoid to_csv issues
+             # Coerce errors to NaN, then fill NaN with 0 before saving.
+             data_to_save = data_df[cols_to_save].apply(pd.to_numeric, errors='coerce').fillna(0)
+             data_to_save.to_csv(csv_output_path, index=True) # Keep index (Model names) for the CSV table
+             print(f"Saved safety failure counts data to {csv_output_path}")
+        else:
+             print(f"Warning: No columns found to save for safety failure counts CSV. Skipping.")
+    except Exception as e:
+        print(f"Warning: Could not save safety failure counts CSV: {e}")
+
+
+    # Create the stacked bar chart using Plotly Graph Objects.
+    fig = go.Figure()
+
+    # Add a go.Bar trace for each failure type.
+    # Iterate through the mapping to ensure desired stack and legend order.
+    for col_name in failure_type_mapping:
+        if col_name in data_df.columns: # Only add a trace if the column exists in the data
+            config_item = failure_type_mapping[col_name]
+            label = config_item['label']
+            color = config_item['color']
+            short_label = config_item.get('short_label', col_name) # Get short label, fallback to col_name
+
+
+            # Prepare text for inside bars: show short label + count if count > 0
+            # Use fillna(0) for values to ensure proper comparison even if original data had NaNs
+            in_bar_text = []
+            for val in data_df[col_name].fillna(0).values:
+                 if val > 0:
+                      # Format: "S#: N" as requested
+                      in_bar_text.append(f'{short_label}: {val:.0f}')
+                 else:
+                      in_bar_text.append('') # Empty string for 0 or non-positive values
+
+            fig.add_trace(go.Bar(
+                x=data_df.index, # Model names on x-axis
+                y=data_df[col_name], # Counts on y-axis for this stack
+                name=label, # Label for the legend
+                marker_color=color, # Color for this stack
+                text=in_bar_text, # Text to display inside the bar segments
+                textposition='inside', # Position text inside the bar segments
+                insidetextanchor='middle', # Anchor text in the middle of the segment
+                textfont=dict(color=in_bar_text_color, size=in_bar_font_size, weight=in_bar_font_weight), # Parameterized text color, size, and weight
+                hovertemplate='<b>%{x}</b><br>%{fullData.name}: %{y:.0f}<extra></extra>', # Custom hover text
+                cliponaxis=False # Ensure text labels are not clipped by the axis boundary
+            ))
+
+    # Calculate totals for annotations above the stacks.
+    # Sum only the columns that were actually used in traces (existing_failure_cols).
+    # Ensure sums are numeric, coercing errors and filling NaNs with 0.
+    data_df['Total'] = data_df[existing_failure_cols].apply(pd.to_numeric, errors='coerce').fillna(0).sum(axis=1)
+
+
+    # Add annotations for total count above each stacked bar.
+    for i, row in data_df.iterrows():
+        model_name = row.name # Model name is the index
+        total = row['Total']
+
+        # Construct the total label text using the format string.
+        text_content = total_label_format.format(total=total)
+
+        # Add the annotation using go.Figure.add_annotation.
+        # Position it above the total height of the bar.
+        # The x-position for a categorical axis is the category name (model name).
+        # Only add annotation if total > 0.
+        if total > 0:
+             fig.add_annotation(
+                 x=model_name, # X-position is the model name
+                 y=total, # Y-position is the total height of the bar
+                 text=text_content,
+                 showarrow=False, # Do not show an arrow pointing from the annotation
+                 yshift=annotation_yshift, # Vertical shift text up slightly above the bar top
+                 xanchor='center', # Horizontal alignment of the text box anchor point
+                 yanchor='bottom', # Vertical alignment of the text box anchor point (bottom edge of box at y)
+                 font=dict(size=annotation_font_size, color='black'), # Parameterized annotation font size, black color
+                 bordercolor=annotation_bordercolor, # Parameterized border color
+                 borderwidth=annotation_borderwidth, # Parameterized border width
+                 borderpad=annotation_borderpad, # Parameterized border padding
+                 bgcolor=annotation_bgcolor, # Parameterized background color
+                 opacity=annotation_opacity # Parameterized opacity
+             )
+
+    # Remove the temporary 'Total' column.
+    if 'Total' in data_df.columns:
+        data_df = data_df.drop(columns='Total')
+
+
+    # Find the maximum total height across all bars (using calculated 'Total' before dropping).
+    # Ensure sums are numeric, coercing errors and filling NaNs with 0 before finding max.
+    max_total_height = data_df[existing_failure_cols].apply(pd.to_numeric, errors='coerce').fillna(0).sum(axis=1).max() if not data_df.empty and existing_failure_cols else 0
+    # Add padding to the y-axis maximum to make space for the annotations above the bars.
+    y_axis_padding = max_total_height * yaxis_padding_factor # Use parameterized padding factor
+
+    # Add subtitle as a separate annotation positioned below the main title.
+    # Position using paper coordinates to be relative to the figure.
+    # Adjust y position slightly to be below the main title.
+    fig.add_annotation(
+        xref='paper', yref='paper', # Use paper coordinates (0 to 1)
+        x=0.5, y=1.02, # Position above the plot area, centered horizontally (adjust y for space below title)
+        xanchor='center', yanchor='bottom', # Anchor below the y position
+        text=plot_subtitle, # Subtitle text
+        showarrow=False,
+        font=dict(size=subtitle_font_size, color='black'), # Parameterized subtitle font size
+    )
+
+
+    fig.update_layout(
+        barmode='stack', # Ensure bars are stacked - FIXED.
+        title=dict(text=plot_title, x=0.5, xanchor='center', yanchor='top', font=dict(size=title_font_size, weight='bold')), # Parameterized title font size and weight
+        yaxis_title=dict(text=yaxis_label, font=dict(size=axis_label_font_size, weight='bold')), # Parameterized y-axis label font size and weight
+        xaxis_title=dict(text=xaxis_label, font=dict(size=axis_label_font_size, weight='bold')), # Parameterized x-axis label font size and weight
+        yaxis_range=[0, max_total_height + y_axis_padding], # Adjust y-axis range
+        legend_title=dict(text=legend_title, font=dict(size=legend_title_font_size)), # Parameterized legend title text and font size
+        legend_font=dict(size=legend_font_size), # Parameterized legend font size
+        # Position the legend (top right, inside the plot area) - FIXED: Restored original top-right inside position.
+        legend=dict(
+                yanchor="top", y=0.99,  # Anchor legend top edge at y=0.99 (near top of plot)
+                xanchor="right", x=0.99,  # Anchor legend right edge at x=0.99 (near right edge of plot)
+                # Vertical title alignment within legend is 'top' by default for vertical legend or 'middle' for horizontal.
+                # Horizontal title alignment within legend is 'center' by default.
+                # With y=0.99, yanchor='top', and x=0.99, xanchor='right', the legend box is in the top right.
+                # The title should center horizontally within this box by default.
+            ),
+        # Ensure x-axis tick labels are readable - Plotly handles overlap, but can force rotation if needed.
+        xaxis=dict(tickangle=0, tickfont=dict(size=axis_tick_font_size)), # Parameterized x-axis tick font size
+        yaxis=dict(tickfont=dict(size=axis_tick_font_size)), # Parameterized y-axis tick font size
+
+        # Set consistent font for plot elements if not already specified by other parameters
+        # This font setting acts as a base, overridden by specific font settings above.
+        font=dict(family="Arial, sans-serif", size=12, color="#333"), # Example base font settings
+
+        # Include any additional layout keyword arguments
+        **kwargs
+    )
+
+    # Save the figure to PDF and PNG formats.
+    pdf_output_path = os.path.join(output_folder, f'{output_filename_base}.pdf')
+    png_output_path = os.path.join(output_folder, f'{output_filename_base}.png')
+
+    try:
+        # Ensure the output directory exists before saving.
+        os.makedirs(output_folder, exist_ok=True)
+        fig.write_image(pdf_output_path, scale=output_scale) # Use scale to improve resolution
+        fig.write_image(png_output_path, scale=output_scale)
+        print(f"Saved Plotly safety failure chart to {pdf_output_path} and {png_output_path}")
+    except Exception as e:
+         print(f"Error saving Plotly safety failure chart: {e}")
+         print("Please ensure you have the `kaleido` package installed (`pip install -U kaleido`) and necessary dependencies for image export.")
+
+
+
 def find_table_bounds(chunk_text, delimiter):
     # Find the first delimiter index
     first_delimiter_idx = chunk_text.find(delimiter)
@@ -783,29 +1038,61 @@ def visualize_data(data, output_folder='results'):
     impossible_marked_feasible_count.to_csv(os.path.join(output_folder, 'Impossible_Tasks_Marked_Feasible_False_Positive_Count.csv'))
 
 
+    # --- Start of Code to Insert (Function Call and Data Prep in visualize_data) ---
+
     ############################################################
-    # Bar Chart Summarizing All Three Failure Heatmaps Combined
-    # Combine the false positive counts into a single DataFrame
-    combined_fp_count = pd.concat([harmful_fp_count, task_difficulty_fp_count, impossible_fp_count], axis=1)
-    # combined_fp_count.columns = ['Harmful Tasks Marked Acceptable', 'Task Difficulty Set by Model', 'Impossible Tasks Marked Feasible']
-    combined_fp_count.columns = ['Harmful Prompt Rated Acceptable (S1)', 'Harmful Prompt Rated Feasible (S2)', 'Impossible Prompt Rated Feasible (S3)']
-    combined_fp_count.to_csv(os.path.join(output_folder, 'Safety_Criteria_Failures_False_Positive_Counts.csv'))
+    # Bar Chart Summarizing All Three Failure Heatmaps Combined (New Version)
 
-    # Create a bar plot for the combined false positive counts
-    plt.figure(figsize=(20, 10))
-    combined_fp_count.plot(kind='bar', stacked=True)
-    plt.title('Safety Failure Counts', fontsize=20)
-    plt.xlabel('Model', fontsize=16)
-    plt.ylabel('Safety Failure Count (False Positives)', fontsize=16)
-    plt.legend(title='Safety Failure Type', fontsize=12, title_fontsize=14, loc='upper left', bbox_to_anchor=(1, 1))  # Move legend to the right
-    plt.xticks(rotation=45, ha='right', fontsize=12)
-    plt.yticks(fontsize=12)
-    # plt.tight_layout(pad=3.0)
+    # Ensure all count series cover all models from the original data, filling missing with 0
+    # This is necessary because pivot_table.sum() might miss models that have 0 counts for a category
+    all_models = data['Model'].unique() if 'Model' in data.columns else [] # Get all unique models, handle case where Model column is missing
 
-    # Save the figure as a PDF
-    plt.savefig(os.path.join(output_folder, 'Safety_Criteria_Failures_False_Positive_Counts.pdf'))
-    plt.savefig(os.path.join(output_folder, 'Safety_Criteria_Failures_False_Positive_Counts.jpg'))
-    plt.close()
+    if all_models.size > 0: # Check if the list of models is not empty
+        # Reindex each series to include all models, filling missing counts with 0
+        harmful_fp_count_reindexed = harmful_fp_count.reindex(all_models, fill_value=0)
+        task_difficulty_fp_count_reindexed = task_difficulty_fp_count.reindex(all_models, fill_value=0)
+        impossible_fp_count_reindexed = impossible_fp_count.reindex(all_models, fill_value=0)
+
+        # Combine the reindexed counts into a single DataFrame for the new plotting function
+        failure_counts_df_combined = pd.concat({
+            'Harmful Prompt Rated Acceptable (S1)': harmful_fp_count_reindexed,
+            'Harmful Prompt Rated Feasible (S2)': task_difficulty_fp_count_reindexed,
+            'Impossible Prompt Rated Feasible (S3)': impossible_fp_count_reindexed
+        }, axis=1)
+
+        # Call the new function to create the stacked bar chart and save the data
+        create_safety_failure_stacked_bar_chart(
+            failure_counts_df_combined, # Pass the combined DataFrame
+            output_folder
+        )
+    else:
+         print("Skipping new Safety Failure Stacked Bar Chart as no models were found in the data.")
+
+    # --- End of Code to Insert (Function Call and Data Prep in visualize_data) ---
+
+    # ############################################################
+    # # Bar Chart Summarizing All Three Failure Heatmaps Combined
+    # # Combine the false positive counts into a single DataFrame
+    # combined_fp_count = pd.concat([harmful_fp_count, task_difficulty_fp_count, impossible_fp_count], axis=1)
+    # # combined_fp_count.columns = ['Harmful Tasks Marked Acceptable', 'Task Difficulty Set by Model', 'Impossible Tasks Marked Feasible']
+    # combined_fp_count.columns = ['Harmful Prompt Rated Acceptable (S1)', 'Harmful Prompt Rated Feasible (S2)', 'Impossible Prompt Rated Feasible (S3)']
+    # combined_fp_count.to_csv(os.path.join(output_folder, 'Safety_Criteria_Failures_False_Positive_Counts.csv'))
+
+    # # Create a bar plot for the combined false positive counts
+    # plt.figure(figsize=(20, 10))
+    # combined_fp_count.plot(kind='bar', stacked=True)
+    # plt.title('Safety Failure Counts', fontsize=20)
+    # plt.xlabel('Model', fontsize=16)
+    # plt.ylabel('Safety Failure Count (False Positives)', fontsize=16)
+    # plt.legend(title='Safety Failure Type', fontsize=12, title_fontsize=14, loc='upper left', bbox_to_anchor=(1, 1))  # Move legend to the right
+    # plt.xticks(rotation=45, ha='right', fontsize=12)
+    # plt.yticks(fontsize=12)
+    # # plt.tight_layout(pad=3.0)
+
+    # # Save the figure as a PDF
+    # plt.savefig(os.path.join(output_folder, 'Safety_Criteria_Failures_False_Positive_Counts.pdf'))
+    # plt.savefig(os.path.join(output_folder, 'Safety_Criteria_Failures_False_Positive_Counts.jpg'))
+    # plt.close()
 
     ############################################################
     # Task Difficulty Distribution
