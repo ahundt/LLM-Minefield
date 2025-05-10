@@ -183,35 +183,60 @@ def gather_prompts(input_folder):
     return prompts
 
 
-def create_run_folders(output_base_folder, timestamp, run_folder=None):
+def create_run_folders(output_base_folder, output_folder, resume, current_run_timestamp):
     """
-    Creates a timestamped run folder within the output_base_folder
+    Determines the run folder and timestamp, creates a timestamped run folder within the output_base_folder,
     and creates 'model_output' and 'model_analysis' subfolders inside it.
 
     Args:
         output_base_folder (str): The base directory for runs.
+        output_folder (str): The specific output folder to use, if provided.
+        resume (bool): Whether to resume from the latest run folder.
+        current_run_timestamp (str): The current timestamp to use for creating a new run folder.
 
     Returns:
-        tuple: A tuple containing (run_folder, model_output_folder, model_analysis_folder),
-               or (None, None, None) if folder creation fails.
+        tuple: A tuple containing (run_folder, model_output_folder, model_analysis_folder, run_timestamp),
+               or (None, None, None, None) if folder creation fails.
     """
-    if run_folder is None:
-        run_folder_name = f"run_{timestamp}"
-        run_folder = os.path.join(output_base_folder, run_folder_name)
+    run_folder = None
+    run_timestamp = None
+
+    # Determine the run folder and timestamp
+    if output_folder:
+        # Use the specified output folder
+        run_folder = output_folder
+        match = re.search(r'run_(\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2})', run_folder)
+        run_timestamp = match.group(1) if match else None
+    elif resume and not output_folder:
+        # Resume from the latest folder in the base folder
+        sorted_folders = sorted(
+            [folder for folder in os.listdir(output_base_folder) if os.path.isdir(os.path.join(output_base_folder, folder))]
+        )
+        run_folder = os.path.join(output_base_folder, sorted_folders[-1]) if sorted_folders else None
+        if run_folder:
+            match = re.search(r'run_(\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2})', run_folder)
+            run_timestamp = match.group(1) if match else None
+    else:
+        # Create a new run folder with the current timestamp
+        run_timestamp = current_run_timestamp
+        run_folder = os.path.join(output_base_folder, f"run_{run_timestamp}")
+
+    if not run_folder or not run_timestamp:
+        print("Error: Unable to determine or create run folder.", file=sys.stderr)
+        return None, None, None, None
+
+    # Create subfolders for model output and analysis
     model_output_folder = os.path.join(run_folder, 'model_output')
     model_analysis_folder = os.path.join(run_folder, 'model_analysis')
 
     try:
-        # Use exist_ok=True so it doesn't fail if output_base_folder already exists
         os.makedirs(model_output_folder, exist_ok=True)
         os.makedirs(model_analysis_folder, exist_ok=True)
-        # Print to the current stdout (console or log file)
         print(f"Created run folder structure: {run_folder}")
-        return run_folder, model_output_folder, model_analysis_folder
+        return run_folder, model_output_folder, model_analysis_folder, run_timestamp
     except OSError as e:
-        # Print error to the current stderr (console or log file)
         print(f"Error creating run folders in {output_base_folder}: {e}", file=sys.stderr)
-        return None, None, None
+        return None, None, None, None
 
 
 def run_models_on_prompts(prompts, models):
@@ -466,81 +491,45 @@ def main():
 
     # Initial message before logging setup - goes to original console
     # Using original_stdout/stderr explicitly or builtins.print for robustness
-    builtins.print("Starting minefield_run process (v4)...", file=original_stdout) # Use builtins.print for absolute certainty
+    builtins.print("Starting minefield_run process (v4)...", file=original_stdout)  # Use builtins.print for absolute certainty
 
     # 1. Parse arguments
     # Parse command line arguments to get configuration
     parser = parser_setup()
     args = minefield_summary.parse_args_and_config(parser=parser)
 
-    run_folder = None
-    # if output_folder is specified, use it as the run folder
-    if args.output_folder:
-        run_folder = args.output_folder
-        run_timestamp = re.search(r'run_(\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2})', run_folder)
-
-    elif args.resume and args.output_folder == '':
-        # get the timestamp string from the latest folder, everything after run_
-        sorted_folders = sorted([folder for folder in os.listdir(args.output_base_folder) if os.path.isdir(os.path.join(args.output_base_folder, folder))])
-        # the latest folder is the run folder
-        run_folder = sorted_folders[-1] if sorted_folders else None
-        if run_folder is not None:
-            run_timestamp = re.search(r'run_(\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2})', run_folder)
-    else:
-        run_timestamp = args.current_run_timestamp
-        # 3. Create run folders
-        # This might print messages about folder creation success or error to the original console
-    timestamp = args.current_run_timestamp
-    run_folder, model_output_folder, model_analysis_folder = create_run_folders(args.output_base_folder, run_timestamp, run_folder=run_folder)
-
-    # Print arguments *before* setting up logging, so they appear initially in the console
-    # Using original_stdout explicitly or builtins.print
-    builtins.print(f"Arguments parsed: {args}", file=original_stdout) # Use builtins.print
-
     # 2. Gather prompts from input folder
     # This might print warnings/errors about specific files to the original console
     original_prompts = gather_prompts(args.input_folder)
     if not original_prompts:
-        builtins.print("No valid prompts found. Exiting.", file=original_stderr) # Use builtins.print
+        builtins.print("No valid prompts found. Exiting.", file=original_stderr)  # Use builtins.print
         return
 
-    if run_folder is None: # Check if folder creation failed
-        builtins.print("Failed to create run folders. Exiting.", file=original_stderr) # Use builtins.print
+    # 3. Create run folders
+    # Extract the current timestamp for folder creation
+    current_run_timestamp = args.current_run_timestamp
+    run_folder, model_output_folder, model_analysis_folder, run_timestamp = create_run_folders(
+        output_base_folder=args.output_base_folder,
+        output_folder=args.output_folder,
+        resume=args.resume,
+        current_run_timestamp=current_run_timestamp
+    )
+
+    if not run_folder:  # Check if folder creation failed
+        builtins.print("Failed to create run folders. Exiting.", file=original_stderr)  # Use builtins.print
         return
 
-    # --- Set up logging and save arguments ---
-    # Now that we have the run_folder, set up logging and save arguments
+    # --- Set up logging ---
     log_filepath = os.path.join(run_folder, 'run.log')
-    args_filepath = os.path.join(run_folder, 'run_args.json')
 
-    log_file = None # Initialize log_file handle
+    log_file = None  # Initialize log_file handle
     try:
         # Open log file for writing console output
         # Use 'w' mode to overwrite any previous attempts within this run
         log_file = open(log_filepath, 'w', encoding='utf-8')
-        # sys.stdout = log_file # Redirect stdout
-        # sys.stderr = log_file # Redirect stderr
 
         # Log confirmation and start time to the new log file (via redirected stdout)
-        # print(f"Logging console output to '{log_filepath}'...")
-        print(f"Run started at {timestamp} original run started at {run_timestamp}\n")
-
-        # # Save arguments to JSON file
-        # args_dict = {
-        #     # Convert Namespace attributes to dictionary entries
-        #     'input_folder': args.input_folder,
-        #     'output_base_folder': args.output_base_folder,
-        #     'models': args.models, # Already a list
-        #     'skip_descriptor_drop': args.skip_descriptor_drop,
-        #     'rename_models': args.rename_models # Already a dict from json.loads
-        # }
-        # with open(args_filepath, 'w', encoding='utf-8') as f:
-        #     # Use sort_keys and indent for consistent and readable output
-        #     json.dump(args_dict, f, indent=4, sort_keys=True)
-        # print(f"Saved arguments to '{args_filepath}'") # This print goes to the log file
-
-        # Repeat arguments in log file for completeness and easier debugging
-        # print(f"Arguments parsed (logged): {args_dict}") # Log the dict form
+        print(f"Run started at {current_run_timestamp} (original run timestamp: {run_timestamp})\n")
 
         # --- START v4 Main Logic within logging context ---
 
@@ -555,14 +544,13 @@ def main():
         # This replaces the subprocess call from previous versions.
         perform_summary_analysis(model_output_folder, model_analysis_folder, args)
 
-        print("\nMinefield run process finished successfully (v4).") # This goes to the log file
+        print("\nMinefield run process finished successfully (v4).")  # This goes to the log file
 
     except Exception as e:
         # Catch any exception that occurs *after* logging is set up (within the try block)
         # Print error and traceback to the redirected stderr (which is the log file)
         print(f"\nFATAL EXCEPTION occurred during run: {e}", file=sys.stderr)
-        traceback.print_exc(file=sys.stderr) # Print traceback to log file
-        # Note: We could potentially exit(1) here, but the 'finally' block is more important.
+        traceback.print_exc(file=sys.stderr)  # Print traceback to log file
 
     finally:
         # --- Restore original stdout/stderr and close log file ---
@@ -588,7 +576,6 @@ def main():
     # This confirms the script finished, even if errors occurred before the final print in the log.
     # Using builtins.print for absolute certainty.
     builtins.print("Minefield run process completed (check log file in run folder for full output).", file=original_stdout)
-
 
 if __name__ == "__main__":
     main()
