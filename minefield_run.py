@@ -111,11 +111,17 @@ def parser_setup(parser=None):
     return parser
 
 
-def get_first_chunk(filepath):
+def read_prompt_markdown_file(filepath):
     """
-    Reads a file and returns the text content before the first model section,
-    by reusing logic from minefield_summary.split_per_model_chunks.
-    Returns None on read or parse errors.
+    Reads a markdown file and extracts the prompt (first chunk) and any existing model responses.
+
+    Args:
+        filepath (str): Path to the markdown file.
+
+    Returns:
+        tuple: A tuple containing:
+            - prompt (str): The text content before the first model section.
+            - model_responses (dict): A dictionary {model_id: response_text} of existing model responses.
     """
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -123,18 +129,21 @@ def get_first_chunk(filepath):
     except Exception as e:
         # Print to the current stderr (console or log file)
         print(f"Error reading file {filepath}: {e}", file=sys.stderr)
-        return None
+        return None, {}
 
     # Reuse minefield_summary's splitting logic.
     # minefield_summary.split_per_model_chunks returns a tuple:
     # (model_chunks[1:], model_names, model_urls, model_chunks[0])
-    # We only need the fourth element, which is the first chunk (the prompt).
+    # We need the fourth element (the first chunk) for the prompt
+    # and the first two elements for model responses.
     try:
-        # Pass the entire file content to the summary's splitting function
-        # The summary function might raise an error if the input format is unexpected.
-        _, _, _, first_chunk = minefield_summary.split_per_model_chunks(content)
-        # The returned first_chunk is already stripped by minefield_summary.split_per_model_chunks
-        return first_chunk
+        model_chunks, model_names, _, first_chunk = minefield_summary.split_per_model_chunks(content)
+
+        # Create a dictionary of model responses
+        model_responses = {model_name: chunk.strip() for model_name, chunk in zip(model_names, model_chunks)}
+
+        # Return the prompt and the model responses
+        return first_chunk.strip(), model_responses
     except Exception as e:
         # Handle potential errors within the summary's parsing function itself
         # This might happen if the file content is malformed in a way
@@ -142,7 +151,7 @@ def get_first_chunk(filepath):
         # Print to the current stderr (console or log file)
         print(f"Error parsing file content using minefield_summary logic for {filepath}: {e}", file=sys.stderr)
         # Returning None signals that this file could not be processed
-        return None
+        return None, {}
 
 
 def gather_prompts(input_folder):
@@ -157,7 +166,7 @@ def gather_prompts(input_folder):
     if not os.path.isdir(input_folder):
         # Print to the current stderr (console or log file)
         print(f"Error: Input folder not found or is not a directory: {input_folder}", file=sys.stderr)
-        return prompts # Return empty dict on error
+        return prompts  # Return empty dict on error
 
     # List files in the directory, filter for actual files ending with .txt or .md
     files = [f for f in os.listdir(input_folder) if os.path.isfile(os.path.join(input_folder, f)) and (f.endswith('.txt') or f.endswith('.md'))]
@@ -168,16 +177,15 @@ def gather_prompts(input_folder):
 
     for filename in files:
         filepath = os.path.join(input_folder, filename)
-        prompt = get_first_chunk(filepath)
-        # get_first_chunk returns None on read errors or parsing errors
+        prompt, _ = read_prompt_markdown_file(filepath)  # Only extract the prompt
         if prompt is not None:
             # Use the base filename as the key
             prompts[filename] = prompt
             # Print to the current stdout (console or log file)
             print(f"Gathered prompt from '{filename}'")
         else:
-             # get_first_chunk already printed an error/warning if it failed
-             pass # Skip adding this file if it failed
+            # read_prompt_markdown_file already printed an error/warning if it failed
+            pass  # Skip adding this file if it failed
 
     print(f"Finished gathering prompts. Found {len(prompts)} valid prompts.")
     return prompts
@@ -239,13 +247,17 @@ def create_run_folders(output_base_folder, output_folder, resume, current_run_ti
         return None, None, None, None
 
 
-def run_models_on_prompts(prompts, models):
+def run_models_on_prompts(prompts, models, existing_outputs, output_folder, run_timestamp):
     """
-    Runs each specified model on each gathered prompt using the Ollama API.
+    Runs each specified model on each gathered prompt using the Ollama API,
+    skipping prompts that already have results, and saves outputs incrementally.
 
     Args:
         prompts (dict): Dictionary of filename: prompt string.
         models (list): List of model ID strings.
+        existing_outputs (dict): Nested dictionary of existing outputs {filename: {model_id: response_text}}.
+        output_folder (str): Path to the folder where outputs will be saved.
+        run_timestamp (str): Timestamp to prefix output filenames.
 
     Returns:
         dict: A nested dictionary filename: {model_id: response_text}.
@@ -254,29 +266,17 @@ def run_models_on_prompts(prompts, models):
               An empty dictionary indicates no models were run or all attempts failed
               or all prompts were empty.
     """
-    results = {}
+    results = existing_outputs.copy()  # Start with existing outputs
     total_prompts = len(prompts)
     total_models = len(models)
-    total_tasks = total_prompts * total_models  # This count includes potential skips if prompt is empty
+    total_tasks = total_prompts * total_models
     current_task = 0
 
     if not prompts:
         print("No prompts available to run models on.")
         return results
 
-    # If no models are specified, populate results with skipped notes and return early
-    if not models:
-        print("No models specified to run.")
-        # Add a note to results for each prompt indicating models were skipped
-        for filename in prompts:
-            results[filename] = {model_id: "NOTE: No models specified to run." for model_id in models}
-        return results
-
     print(f"Starting model runs: {total_tasks} tasks ({total_prompts} prompts x {total_models} models)")
-
-    # Initialize results for all filenames
-    for filename in prompts:
-        results[filename] = {}
 
     # Outer loop: Iterate over models
     for model_id in tqdm(models, desc="Processing Models", unit="model", file=sys.stderr):
@@ -285,10 +285,13 @@ def run_models_on_prompts(prompts, models):
             current_task += 1
             tqdm.write(f"[{current_task}/{total_tasks}] Running '{model_id}' on '{filename}'...")
 
-            # Check if prompt is empty
+            if filename in results and model_id in results[filename]:
+                tqdm.write(f"Skipping '{filename}' for model '{model_id}' (already exists).")
+                continue
+
             if not prompt.strip():
                 tqdm.write(f"Skipping model runs for '{filename}' due to empty prompt.")
-                results[filename][model_id] = "NOTE: Skipped model run due to empty prompt."
+                results.setdefault(filename, {})[model_id] = "NOTE: Skipped model run due to empty prompt."
                 continue
 
             try:
@@ -300,8 +303,8 @@ def run_models_on_prompts(prompts, models):
                 if not response_text:  # Handle empty content or unexpected response structure
                     # Store an explicit message if model returned empty response
                     response_text = f"Warning: Model '{model_id}' returned empty content for '{filename}'. Full response: {response}"
-                results[filename][model_id] = response_text  # Store success or empty warning message
-                tqdm.write(f"Successfully got response from '{model_id}' for '{filename}'.")
+                results.setdefault(filename, {})[model_id] = response_text
+                save_combined_outputs({filename: prompt}, {filename: results[filename]}, output_folder, models, run_timestamp)
 
             except ollama.ResponseError as e:
                 # Specific error for API issues (e.g., model not found, invalid model)
@@ -312,7 +315,7 @@ def run_models_on_prompts(prompts, models):
             except Exception as e:
                 # Catch any other exceptions (e.g., connection errors, unexpected issues)
                 error_message = f"ERROR: An unexpected error occurred: {e}"
-                results[filename][model_id] = error_message
+                results.setdefault(filename, {})[model_id] = error_message
                 tqdm.write(f"{error_message}")
 
     # After iterating through all models and prompts, the results dictionary
@@ -320,6 +323,34 @@ def run_models_on_prompts(prompts, models):
     # successfully gathered prompt.
     print("\nFinished all model runs.")
     return results
+
+
+def load_existing_outputs(output_folder):
+    """
+    Loads existing combined outputs from the specified folder.
+
+    Args:
+        output_folder (str): Path to the folder containing combined output files.
+
+    Returns:
+        dict: A nested dictionary {filename: {model_id: response_text}}.
+    """
+    existing_outputs = {}
+
+    if not os.path.isdir(output_folder):
+        print(f"Warning: Output folder '{output_folder}' does not exist. No existing outputs loaded.")
+        return existing_outputs
+
+    for file in os.listdir(output_folder):
+        if file.endswith(".md"):
+            filepath = os.path.join(output_folder, file)
+            _, model_responses = read_prompt_markdown_file(filepath)  # Extract only model responses
+            if model_responses:
+                filename = os.path.splitext(file)[0]
+                existing_outputs[filename] = model_responses
+
+    print(f"Loaded existing outputs for {len(existing_outputs)} files.")
+    return existing_outputs
 
 
 def save_combined_outputs(original_prompts, model_results, output_folder, models_list):
