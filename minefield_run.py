@@ -113,7 +113,7 @@ def parser_setup(parser=None):
 
 def read_prompt_markdown_file(filepath):
     """
-    Reads a markdown file and extracts the prompt (first chunk) and any existing model responses.
+    Reads a markdown file and extracts the prompt (first chunk) and model responses (other chunks) as raw text chunks, plus associated URLs.
 
     Args:
         filepath (str): Path to the markdown file.
@@ -122,6 +122,7 @@ def read_prompt_markdown_file(filepath):
         tuple: A tuple containing:
             - prompt (str): The text content before the first model section.
             - model_responses (dict): A dictionary {model_id: response_text} of existing model responses.
+            - model_urls (dict): A dictionary {model_id: model_url} of associated model URLs.
     """
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -129,21 +130,22 @@ def read_prompt_markdown_file(filepath):
     except Exception as e:
         # Print to the current stderr (console or log file)
         print(f"Error reading file {filepath}: {e}", file=sys.stderr)
-        return None, {}
+        return None, {}, {}
 
     # Reuse minefield_summary's splitting logic.
     # minefield_summary.split_per_model_chunks returns a tuple:
     # (model_chunks[1:], model_names, model_urls, model_chunks[0])
-    # We need the fourth element (the first chunk) for the prompt
-    # and the first two elements for model responses.
+    # We need the fourth element (the first chunk) for the prompt,
+    # the first two elements for model responses and URLs.
     try:
-        model_chunks, model_names, _, first_chunk = minefield_summary.split_per_model_chunks(content)
+        model_chunks, model_names, model_urls, first_chunk = minefield_summary.split_per_model_chunks(content)
 
-        # Create a dictionary of model responses
+        # Create dictionaries for model responses and URLs
         model_responses = {model_name: chunk.strip() for model_name, chunk in zip(model_names, model_chunks)}
+        model_urls_dict = {model_name: model_url for model_name, model_url in zip(model_names, model_urls)}
 
-        # Return the prompt and the model responses
-        return first_chunk.strip(), model_responses
+        # Return the prompt, model responses, and model URLs
+        return first_chunk.strip(), model_responses, model_urls_dict
     except Exception as e:
         # Handle potential errors within the summary's parsing function itself
         # This might happen if the file content is malformed in a way
@@ -151,8 +153,7 @@ def read_prompt_markdown_file(filepath):
         # Print to the current stderr (console or log file)
         print(f"Error parsing file content using minefield_summary logic for {filepath}: {e}", file=sys.stderr)
         # Returning None signals that this file could not be processed
-        return None, {}
-
+        return None, {}, {}
 
 def gather_prompts(input_folder):
     """
@@ -177,7 +178,7 @@ def gather_prompts(input_folder):
 
     for filename in files:
         filepath = os.path.join(input_folder, filename)
-        prompt, _ = read_prompt_markdown_file(filepath)  # Only extract the prompt
+        prompt, _, _ = read_prompt_markdown_file(filepath)  # Only extract the prompt
         if prompt is not None:
             # Use the base filename as the key
             prompts[filename] = prompt
@@ -327,37 +328,41 @@ def run_models_on_prompts(prompts, models, existing_outputs, output_folder, run_
 
 def load_existing_outputs(output_folder):
     """
-    Loads existing combined outputs from the specified folder.
+    Loads existing combined outputs from the specified folder, including model responses and URLs.
 
     Args:
         output_folder (str): Path to the folder containing combined output files.
 
     Returns:
-        dict: A nested dictionary {filename: {model_id: response_text}}.
+        tuple: A tuple containing:
+            - existing_outputs (dict): A nested dictionary {filename: {model_id: response_text}}.
+            - model_urls (dict): A nested dictionary {filename: {model_id: model_url}}.
     """
     existing_outputs = {}
+    model_urls = {}
 
     if not os.path.isdir(output_folder):
         print(f"Warning: Output folder '{output_folder}' does not exist. No existing outputs loaded.")
-        return existing_outputs
+        return existing_outputs, model_urls
 
     for file in os.listdir(output_folder):
         if file.endswith(".md"):
             filepath = os.path.join(output_folder, file)
-            _, model_responses = read_prompt_markdown_file(filepath)  # Extract only model responses
+            _, model_responses, urls = read_prompt_markdown_file(filepath)  # Extract responses and URLs
             if model_responses:
                 filename = os.path.splitext(file)[0]
                 existing_outputs[filename] = model_responses
+                model_urls[filename] = urls
 
     print(f"Loaded existing outputs for {len(existing_outputs)} files.")
-    return existing_outputs
+    return existing_outputs, model_urls
 
 
-def save_combined_outputs(original_prompts, model_results, output_folder, models_list):
+def save_combined_outputs(original_prompts, model_results, output_folder, models_list, model_urls):
     """
-    Formats and saves the original prompt and each model's response into separate
-    Markdown files in the specified output folder. Files are named after the
-    original input files. These files serve as input for minefield_summary analysis.
+    Formats and saves the original prompt, each model's response, and associated URLs into separate
+    Markdown files in the specified output folder. Files are named after the original input files.
+    These files serve as input for minefield_summary analysis.
 
     Args:
         original_prompts (dict): Dictionary of filename: original_prompt string.
@@ -370,19 +375,21 @@ def save_combined_outputs(original_prompts, model_results, output_folder, models
                             Used to ensure a section for every requested model exists in the
                             output file, even if the model failed or was skipped for a
                             specific prompt.
+        model_urls (dict): Nested dictionary filename: {model_id: model_url}.
+                           Contains the URLs associated with each model for each file.
     """
     print(f"\n--- Saving combined model outputs to '{output_folder}' ---")
 
     if not os.path.isdir(output_folder):
-         print(f"Error: Output folder not found or is not a directory: {output_folder}", file=sys.stderr)
-         return # Cannot save if folder is missing
+        print(f"Error: Output folder not found or is not a directory: {output_folder}", file=sys.stderr)
+        return  # Cannot save if folder is missing
 
     if not original_prompts:
         print("No original prompts available to save outputs.")
         # Note: model_results might still contain notes if no models were specified,
         # but if there were no prompts, there are no output files to create based on prompts.
         if model_results:
-             print("Warning: Model results exist, but no original prompts were gathered. No output files will be created.")
+            print("Warning: Model results exist, but no original prompts were gathered. No output files will be created.")
         return
 
     # Iterate through the prompts that were actually gathered (and are keys in model_results)
@@ -393,17 +400,16 @@ def save_combined_outputs(original_prompts, model_results, output_folder, models
 
         # Add a separator/newline before model outputs start
         if output_content:
-             output_content += "\n\n"
+            output_content += "\n\n"
         else:
-             output_content += "--- Empty Prompt ---\n\n" # Indicate if original prompt was empty
-
+            output_content += "--- Empty Prompt ---\n\n"  # Indicate if original prompt was empty
 
         # Iterate through the *list of requested models* to ensure all are represented
         # in the output file for this prompt. This loop runs for every prompt in original_prompts.
         for model_id in models_list:
             # Use model_id as both name and a placeholder URL for the summary script
-            model_name_placeholder = model_id
-            model_url_placeholder = f"https://ollama.com/library/{model_id}"  # Construct a valid HTTPS link # minefield_summary parses this URL field
+            # Retrieve the actual URL for the model if available, otherwise use a placeholder
+            model_url = model_urls.get(filename, {}).get(model_id, f"https://ollama.com/library/{model_id}")
 
             # Retrieve the result/note for this model and filename from model_results.
             # model_results is guaranteed to have a key for 'filename' if we are in this loop
@@ -418,12 +424,11 @@ def save_combined_outputs(original_prompts, model_results, output_folder, models
             # The pattern in minefield_summary is r"\n([^\n]+) \(...\):\s*\n"
             # Adding the initial \n makes the generated format match the pattern start.
             # Adding response + \n + \n ensures content between model headers.
-            output_content += f"\n{model_name_placeholder} ({model_url_placeholder}):\n"
+            output_content += f"\n{model_id} ({model_url}):\n"
             # Add model response content, stripping extra whitespace but keeping internal structure
             output_content += response_text.strip() + "\n"
             # Add an extra newline *after* the response content to separate from the next model or end of file
             output_content += "\n"
-
 
         # Determine the output filename (use original filename but ensure .md extension)
         base, ext = os.path.splitext(filename)
