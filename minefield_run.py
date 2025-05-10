@@ -80,7 +80,7 @@ def parser_setup(parser=None):
         '--models',
         type=str,
         nargs='+', # Expect one or more model IDs
-        default=['qwen3:30b', 'gemma3:27b'], # Example default model
+        default=['qwen3:30b', 'gemma3:27b', 'granite3.3:latest', 'llama3.3:latest', 'phi4:latest'], # Example default model
         help='List of LLM model IDs to run (e.g., "ollama/llama3.2 ollama/mistral"). Note: requires Ollama to be running and models pulled.'
     )
 
@@ -97,7 +97,8 @@ def parser_setup(parser=None):
     parser.add_argument(
         '--rename_models',
         type=json.loads, # Use json.loads as the type directly
-        default='{}', # Default is empty JSON string, which json.loads parses to {}
+        # default='{}', # Default is empty JSON string, which json.loads parses to {}
+        default='{"qwen3:30b": "Qwen 3 30B Alibaba", "gemma3:27b": "Gemma 3 27B Google", "granite3.3:latest": "Granite 3.3 8B (IBM)", "llama3.3:latest": "LLaMA 3.3 27B (Meta)", "phi4:latest": "Phi 4 14B Microsoft"}',
         help='(Passed to minefield_summary.process_data) JSON string for renaming models (e.g., \'{"Bing": "CoPilot"}\').'
     )
 
