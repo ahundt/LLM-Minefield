@@ -198,7 +198,7 @@ def create_safety_failure_stacked_bar_chart(
     xaxis_label: str = 'Model',
     legend_title: str = 'Safety Failure Type',
     output_filename_base: str = 'Safety_Criteria_Failures_False_Positive_Counts_Plotly',
-    total_label_format: str = '{total:.0f} Total Failures', # Format string for the total label above the bar
+    total_label_format: str = '{total:.0f} Total', # Format string for the total label above the bar
     annotation_bgcolor: str = "#ffffff",
     annotation_bordercolor: str = "#c7c7c7",
     annotation_borderwidth: int = 1,
@@ -211,9 +211,11 @@ def create_safety_failure_stacked_bar_chart(
     subtitle_font_size: int = 16, # New parameter for subtitle font size
     axis_label_font_size: int = 18, # Parameter for axis label font size (Increased default)
     axis_tick_font_size: int = 14, # Parameter for axis tick label font size (Increased default)
+    model_tick_font_size: int = 14, # New parameter for model tick label font size (Increased default)
     legend_title_font_size: int = 14, # Parameter for legend title font size (Increased default)
     legend_font_size: int = 12, # Parameter for legend text font size (Increased default)
-    annotation_font_size: int = 14, # Parameter for font size of the total annotation text above the bar (Increased default)
+    annotation_font_size: int = 16, # Parameter for font size of the total annotation text above the bar (Increased default) - Made same as in_bar_font_size
+    annotation_font_weight: str = 'bold', # New parameter for bold total annotation text
     in_bar_font_size: int = 16, # Increased font size for text inside bar segments
     in_bar_font_weight: str = 'bold', # Added parameter for bold text inside bar segments
     in_bar_text_color: str = "white", # Changed default color to white for contrast
@@ -249,9 +251,11 @@ def create_safety_failure_stacked_bar_chart(
         subtitle_font_size (int): Font size for the plot subtitle.
         axis_label_font_size (int): Font size for axis labels (x and y).
         axis_tick_font_size (int): Font size for axis tick labels.
+        model_tick_font_size (int): Font size for model tick labels on the x-axis.
         legend_title_font_size (int): Font size for the legend title.
         legend_font_size (int): Font size for the legend text.
         annotation_font_size (int): Font size for the total annotation text above the bar.
+        annotation_font_weight (str): Font weight for the total annotation text above the bar.
         in_bar_font_size (int): Font size for text inside the bar segments.
         in_bar_font_weight (str): Font weight for text inside bar segments (e.g., 'bold', 'normal').
         in_bar_text_color (str): Color for the text inside the bar segments.
@@ -366,7 +370,7 @@ def create_safety_failure_stacked_bar_chart(
                  yshift=annotation_yshift, # Vertical shift text up slightly above the bar top
                  xanchor='center', # Horizontal alignment of the text box anchor point
                  yanchor='bottom', # Vertical alignment of the text box anchor point (bottom edge of box at y)
-                 font=dict(size=annotation_font_size, color='black'), # Parameterized annotation font size, black color
+                 font=dict(size=annotation_font_size, color='black', weight=annotation_font_weight), # Parameterized annotation font size and weight
                  bordercolor=annotation_bordercolor, # Parameterized border color
                  borderwidth=annotation_borderwidth, # Parameterized border width
                  borderpad=annotation_borderpad, # Parameterized border padding
@@ -390,7 +394,7 @@ def create_safety_failure_stacked_bar_chart(
     # Adjust y position slightly to be below the main title.
     fig.add_annotation(
         xref='paper', yref='paper', # Use paper coordinates (0 to 1)
-        x=0.5, y=1.02, # Position above the plot area, centered horizontally (adjust y for space below title)
+        x=0.5, y=1.03, # Position above the plot area, centered horizontally (adjust y for space below title)
         xanchor='center', yanchor='bottom', # Anchor below the y position
         text=plot_subtitle, # Subtitle text
         showarrow=False,
@@ -404,7 +408,7 @@ def create_safety_failure_stacked_bar_chart(
         yaxis_title=dict(text=yaxis_label, font=dict(size=axis_label_font_size, weight='bold')), # Parameterized y-axis label font size and weight
         xaxis_title=dict(text=xaxis_label, font=dict(size=axis_label_font_size, weight='bold')), # Parameterized x-axis label font size and weight
         yaxis_range=[0, max_total_height + y_axis_padding], # Adjust y-axis range
-        legend_title=dict(text=legend_title, font=dict(size=legend_title_font_size)), # Parameterized legend title text and font size
+        legend_title=dict(text=legend_title, font=dict(size=legend_title_font_size, weight='bold')), # Parameterized legend title text, font size, and **BOLD**
         legend_font=dict(size=legend_font_size), # Parameterized legend font size
         # Position the legend (top right, inside the plot area) - FIXED: Restored original top-right inside position.
         legend=dict(
@@ -414,9 +418,18 @@ def create_safety_failure_stacked_bar_chart(
                 # Horizontal title alignment within legend is 'center' by default.
                 # With y=0.99, yanchor='top', and x=0.99, xanchor='right', the legend box is in the top right.
                 # The title should center horizontally within this box by default.
+                # To center the title vertically within the legend box, we can set `title.side` to 'top'.
+                title=dict(
+                    text=legend_title,
+                    font=dict(size=legend_title_font_size, weight='bold'),
+                    side="top" # Center title vertically at the top of the legend box
+                ),
             ),
         # Ensure x-axis tick labels are readable - Plotly handles overlap, but can force rotation if needed.
-        xaxis=dict(tickangle=0, tickfont=dict(size=axis_tick_font_size)), # Parameterized x-axis tick font size
+        xaxis=dict(
+            tickangle=0,
+            tickfont=dict(size=model_tick_font_size, weight='bold') # Parameterized model tick font size and **BOLD**
+        ),
         yaxis=dict(tickfont=dict(size=axis_tick_font_size)), # Parameterized y-axis tick font size
 
         # Set consistent font for plot elements if not already specified by other parameters
