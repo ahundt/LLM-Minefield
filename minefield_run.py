@@ -160,7 +160,7 @@ def gather_prompts(input_folder):
     Scans the input folder for .txt or .md files and extracts the first chunk (prompt) from each.
 
     Returns:
-        dict: A dictionary mapping filename (basename) to the extracted prompt string.
+        dict: A dictionary mapping filename (basename with extension) to the extracted prompt string.
               Returns an empty dictionary if no files are found or parsed successfully.
     """
     prompts = {}
@@ -248,7 +248,7 @@ def create_run_folders(output_base_folder, output_folder, resume, current_run_ti
         return None, None, None, None
 
 
-def run_models_on_prompts(prompts, models, existing_outputs, output_folder, run_timestamp):
+def run_models_on_prompts(prompts, models, output_folder, run_timestamp, existing_outputs=None):
     """
     Runs each specified model on each gathered prompt using the Ollama API,
     skipping prompts that already have results, and saves outputs incrementally.
@@ -267,7 +267,7 @@ def run_models_on_prompts(prompts, models, existing_outputs, output_folder, run_
               An empty dictionary indicates no models were run or all attempts failed
               or all prompts were empty.
     """
-    results = existing_outputs.copy()  # Start with existing outputs
+    results = existing_outputs.copy() if existing_outputs else {}  # Start with existing outputs
     total_prompts = len(prompts)
     total_models = len(models)
     total_tasks = total_prompts * total_models
@@ -310,7 +310,7 @@ def run_models_on_prompts(prompts, models, existing_outputs, output_folder, run_
             except ollama.ResponseError as e:
                 # Specific error for API issues (e.g., model not found, invalid model)
                 error_message = f"ERROR: Ollama Response Error (Status {e.status_code}): {e.error}"
-                results[filename][model_id] = error_message
+                results.setdefault(filename, {})[model_id] = error_message
                 tqdm.write(f"{error_message}")
 
             except Exception as e:
@@ -348,11 +348,11 @@ def load_existing_outputs(output_folder):
     for file in os.listdir(output_folder):
         if file.endswith(".md"):
             filepath = os.path.join(output_folder, file)
-            _, model_responses, urls = read_prompt_markdown_file(filepath)  # Extract responses and URLs
+            prompt, model_responses, urls = read_prompt_markdown_file(filepath)  # Extract responses and URLs
             if model_responses:
-                filename = os.path.splitext(file)[0]
-                existing_outputs[filename] = model_responses
-                model_urls[filename] = urls
+                # Use the base filename (with extension) as the key
+                existing_outputs[file] = model_responses
+                model_urls[file] = urls
 
     print(f"Loaded existing outputs for {len(existing_outputs)} files.")
     return existing_outputs, model_urls
@@ -543,7 +543,7 @@ def main():
 
     # 3. Create run folders
     # Extract the current timestamp for folder creation
-    current_run_timestamp = args.current_run_timestamp
+    current_run_timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     run_folder, model_output_folder, model_analysis_folder, run_timestamp = create_run_folders(
         output_base_folder=args.output_base_folder,
         output_folder=args.output_folder,
@@ -569,16 +569,37 @@ def main():
 
         # --- START v4 Main Logic within logging context ---
 
-        # 4. Run models on gathered prompts
+        # 4. Load existing outputs
+        # Load previously processed outputs and associated model URLs
+        existing_outputs, model_urls = load_existing_outputs(model_output_folder)
+
+        # 5. Run models on gathered prompts
         # These functions and subsequent ones will print to the log file via redirection
-        model_results = run_models_on_prompts(original_prompts, args.models)
+        # Use tqdm's `file=sys.stderr` to ensure progress bars are displayed correctly
+        model_results = run_models_on_prompts(
+            prompts=original_prompts,
+            models=args.models,
+            output_folder=model_output_folder,
+            run_timestamp=run_timestamp,
+            existing_outputs=existing_outputs,
+        )
 
-        # 5. Save combined outputs to the model_output folder
-        save_combined_outputs(original_prompts, model_results, model_output_folder, args.models, run_timestamp)
+        # 6. Save combined outputs to the model_output folder
+        save_combined_outputs(
+            original_prompts=original_prompts,
+            model_results=model_results,
+            output_folder=model_output_folder,
+            models_list=args.models,
+            model_urls=model_urls
+        )
 
-        # 6. Perform summary analysis by calling minefield_summary functions directly
+        # 7. Perform summary analysis by calling minefield_summary functions directly
         # This replaces the subprocess call from previous versions.
-        perform_summary_analysis(model_output_folder, model_analysis_folder, args)
+        perform_summary_analysis(
+            model_output_folder=model_output_folder,
+            model_analysis_folder=model_analysis_folder,
+            args=args
+        )
 
         print("\nMinefield run process finished successfully (v4).")  # This goes to the log file
 
