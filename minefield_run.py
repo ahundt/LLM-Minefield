@@ -51,10 +51,13 @@ except ImportError:
 MODEL_SECTION_START_PATTERN = r"\n([^\n]+) \((https?://\S+)\):\s*\n"
 
 
-def parse_args():
+def parser_setup(parser=None):
     """
     Parses command-line arguments for minefield_run.py.
     """
+    if parser is None:
+        parser = argparse.ArgumentParser(description='Process folder of files')
+
     parser = argparse.ArgumentParser(
         description='Run multiple LLM models on prompts, store results, and analyze with minefield_summary.'
     )
@@ -98,11 +101,14 @@ def parse_args():
         help='(Passed to minefield_summary.process_data) JSON string for renaming models (e.g., \'{"Bing": "CoPilot"}\').'
     )
 
-    args = parser.parse_args()
+    parser.add_argument('--resume', action='store_false', dest='resume', help='Disable resume option that is on by default. If resume is enabled, the script will skip files that have already been processed and have a log file in the logs_chat_folder. If resume is disabled, the script will overwrite existing log files.')
+    parser.add_argument('--output_folder', type=str, default='', help='Path to the output folder, if blank will be loaded from the latest entry in the output_base_folder')
+
+    # args = parser.parse_args()
 
     # Note: args.rename_models now holds the parsed dictionary.
 
-    return args
+    return parser
 
 
 def get_first_chunk(filepath):
@@ -177,7 +183,7 @@ def gather_prompts(input_folder):
     return prompts
 
 
-def create_run_folders(output_base_folder):
+def create_run_folders(output_base_folder, timestamp, run_folder=None):
     """
     Creates a timestamped run folder within the output_base_folder
     and creates 'model_output' and 'model_analysis' subfolders inside it.
@@ -189,9 +195,9 @@ def create_run_folders(output_base_folder):
         tuple: A tuple containing (run_folder, model_output_folder, model_analysis_folder),
                or (None, None, None) if folder creation fails.
     """
-    timestamp = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    run_folder_name = f"run_{timestamp}"
-    run_folder = os.path.join(output_base_folder, run_folder_name)
+    if run_folder is None:
+        run_folder_name = f"run_{timestamp}"
+        run_folder = os.path.join(output_base_folder, run_folder_name)
     model_output_folder = os.path.join(run_folder, 'model_output')
     model_analysis_folder = os.path.join(run_folder, 'model_analysis')
 
@@ -341,7 +347,7 @@ def save_combined_outputs(original_prompts, model_results, output_folder, models
         for model_id in models_list:
             # Use model_id as both name and a placeholder URL for the summary script
             model_name_placeholder = model_id
-            model_url_placeholder = model_id # minefield_summary parses this URL field
+            model_url_placeholder = f"https://ollama.com/library/{model_id}"  # Construct a valid HTTPS link # minefield_summary parses this URL field
 
             # Retrieve the result/note for this model and filename from model_results.
             # model_results is guaranteed to have a key for 'filename' if we are in this loop
@@ -453,6 +459,7 @@ def main():
     Main function to orchestrate the minefield LLM testing and analysis process.
     Includes logging of arguments and console output.
     """
+
     # Store original stdout and stderr before any potential redirection attempts
     original_stdout = sys.stdout
     original_stderr = sys.stderr
@@ -462,7 +469,30 @@ def main():
     builtins.print("Starting minefield_run process (v4)...", file=original_stdout) # Use builtins.print for absolute certainty
 
     # 1. Parse arguments
-    args = parse_args()
+    # Parse command line arguments to get configuration
+    parser = parser_setup()
+    args = minefield_summary.parse_args_and_config(parser=parser)
+
+    run_folder = None
+    # if output_folder is specified, use it as the run folder
+    if args.output_folder:
+        run_folder = args.output_folder
+        run_timestamp = re.search(r'run_(\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2})', run_folder)
+
+    elif args.resume and args.output_folder == '':
+        # get the timestamp string from the latest folder, everything after run_
+        sorted_folders = sorted([folder for folder in os.listdir(args.output_base_folder) if os.path.isdir(os.path.join(args.output_base_folder, folder))])
+        # the latest folder is the run folder
+        run_folder = sorted_folders[-1] if sorted_folders else None
+        if run_folder is not None:
+            run_timestamp = re.search(r'run_(\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2})', run_folder)
+    else:
+        run_timestamp = args.current_run_timestamp
+        # 3. Create run folders
+        # This might print messages about folder creation success or error to the original console
+    timestamp = args.current_run_timestamp
+    run_folder, model_output_folder, model_analysis_folder = create_run_folders(args.output_base_folder, run_timestamp, run_folder=run_folder)
+
     # Print arguments *before* setting up logging, so they appear initially in the console
     # Using original_stdout explicitly or builtins.print
     builtins.print(f"Arguments parsed: {args}", file=original_stdout) # Use builtins.print
@@ -474,9 +504,6 @@ def main():
         builtins.print("No valid prompts found. Exiting.", file=original_stderr) # Use builtins.print
         return
 
-    # 3. Create run folders
-    # This might print messages about folder creation success or error to the original console
-    run_folder, model_output_folder, model_analysis_folder = create_run_folders(args.output_base_folder)
     if run_folder is None: # Check if folder creation failed
         builtins.print("Failed to create run folders. Exiting.", file=original_stderr) # Use builtins.print
         return
@@ -495,25 +522,25 @@ def main():
         # sys.stderr = log_file # Redirect stderr
 
         # Log confirmation and start time to the new log file (via redirected stdout)
-        print(f"Logging console output to '{log_filepath}'...")
-        print(f"Run started at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        # print(f"Logging console output to '{log_filepath}'...")
+        print(f"Run started at {timestamp} original run started at {run_timestamp}\n")
 
-        # Save arguments to JSON file
-        args_dict = {
-            # Convert Namespace attributes to dictionary entries
-            'input_folder': args.input_folder,
-            'output_base_folder': args.output_base_folder,
-            'models': args.models, # Already a list
-            'skip_descriptor_drop': args.skip_descriptor_drop,
-            'rename_models': args.rename_models # Already a dict from json.loads
-        }
-        with open(args_filepath, 'w', encoding='utf-8') as f:
-            # Use sort_keys and indent for consistent and readable output
-            json.dump(args_dict, f, indent=4, sort_keys=True)
-        print(f"Saved arguments to '{args_filepath}'") # This print goes to the log file
+        # # Save arguments to JSON file
+        # args_dict = {
+        #     # Convert Namespace attributes to dictionary entries
+        #     'input_folder': args.input_folder,
+        #     'output_base_folder': args.output_base_folder,
+        #     'models': args.models, # Already a list
+        #     'skip_descriptor_drop': args.skip_descriptor_drop,
+        #     'rename_models': args.rename_models # Already a dict from json.loads
+        # }
+        # with open(args_filepath, 'w', encoding='utf-8') as f:
+        #     # Use sort_keys and indent for consistent and readable output
+        #     json.dump(args_dict, f, indent=4, sort_keys=True)
+        # print(f"Saved arguments to '{args_filepath}'") # This print goes to the log file
 
         # Repeat arguments in log file for completeness and easier debugging
-        print(f"Arguments parsed (logged): {args_dict}") # Log the dict form
+        # print(f"Arguments parsed (logged): {args_dict}") # Log the dict form
 
         # --- START v4 Main Logic within logging context ---
 
@@ -522,7 +549,7 @@ def main():
         model_results = run_models_on_prompts(original_prompts, args.models)
 
         # 5. Save combined outputs to the model_output folder
-        save_combined_outputs(original_prompts, model_results, model_output_folder, args.models)
+        save_combined_outputs(original_prompts, model_results, model_output_folder, args.models, run_timestamp)
 
         # 6. Perform summary analysis by calling minefield_summary functions directly
         # This replaces the subprocess call from previous versions.

@@ -9,6 +9,7 @@ import re
 import os
 import json
 from io import StringIO
+import datetime
 import plotly.express as px
 from plotly import graph_objects as go
 # from matplotlib.colors import ListedColormap
@@ -856,7 +857,7 @@ def categorize_prompt_confusion_matrix(row):
         raise ValueError('Human Specified Acceptability is not True or False')
 
 
-def parse_args(parser=None):
+def parser_setup(parser=None):
     """
     Parses command-line arguments for the script, defining paths, filenames,
     and processing flags.
@@ -909,8 +910,124 @@ def parse_args(parser=None):
     # directly used to construct a path within the processing function.
     parser.add_argument('--statistics_csv', type=str, default='statistics_output.csv', help='Path to output statistics CSV file')
 
-    args = parser.parse_args()
+    # not yet implemented
+    # parser.add_argument('--resume', action='store_false', dest='resume', help='Disable resume option that is on by default. If resume is enabled, the script will skip files that have already been processed and have a log file in the logs_chat_folder. If resume is disabled, the script will overwrite existing log files.')
+
+    return parser
+
+
+def validate_directory(directory):
+    if not os.path.exists(directory):
+        raise NotADirectoryError(f"Directory '{directory}' does not exist.")
+    if not os.path.isdir(directory):
+        raise NotADirectoryError(f"'{directory}' is not a valid directory.")
+
+def validate_file(file_path):
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File '{file_path}' not found.")
+    if not os.path.isfile(file_path):
+        raise FileNotFoundError(f"'{file_path}' is not a valid file.")
+
+
+def process_config(args, config_path=None, args_dict=None):
+    """
+    Loads command line arguments from a JSON config file and updates the args object.
+
+    Args:
+        args (argparse.Namespace or dict): The argparse.Namespace object or a dictionary containing command line arguments.
+        config_path (str, optional): The path to the JSON config file. Defaults to None.
+
+    Raises:
+        FileNotFoundError: If the config file does not exist.
+        ValueError: If the config file contains invalid JSON.
+    """
+    if args_dict is not None:
+        # setattr on all the args items
+        for key in args_dict:
+            setattr(args, key, args_dict[key])
+        return args
+    elif config_path and os.path.exists(config_path):
+        try:
+            with open(config_path, 'r') as config_file:
+                config = json.load(config_file)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON format in the config file: {e}")
+
+        args.__dict__.update(config)
+
+        # Update the args object with the values from the config file
+        for key, value in config.items():
+            setattr(args, key, value)
+        return args
+
+    elif hasattr(args, 'config'):
+        # we have args, check if we need to load a config file
+        # if not, assume we were passed a preloaded args object
+        # this part is here for a backwards compatibility reason
+        if args.config:
+            config_path = os.path.join(args.output_folder, args.config)
+            try:
+                process_config(args, config_path)
+            except (FileNotFoundError, ValueError) as e:
+                print(f"Error while loading config file: {e}")
+                return
+    else:
+        raise FileNotFoundError(f"Config file '{config_path}' not found.")
+
+
+def parse_args_and_config(args=None, parser=None):
+    if parser is None:
+        parser = parser_setup()
+    if args is None:
+        args = parser.parse_args()
+    elif isinstance(args, dict):
+        temp_args = parser.parse_args()
+        args = process_config(temp_args, args_dict=args)
+    else:
+        process_config(args)
+
+    try:
+        validate_directory(args.input)
+        # validate_file(args.codebook_path)
+
+        # if the api_key_file does not exist, set it to none and print an explanation
+        if not os.path.exists(args.api_key_file):
+            print(f"Warning: API key file '{args.api_key_file}' not found. The API key will be set to None, and no real calls will be made to the chat model.")
+            print("If you want to make real calls to the chat model, you must provide a valid API key file that contains only the key itself as plain text.")
+            if args.backend == "openai":
+                print("Instructions to get the OpenAI API key that goes in the file can be found here: https://help.openai.com/en/articles/4936850-where-do-i-find-my-secret-api-key")
+            elif args.backend == "gemini":
+                print("Instructions to get the Gemini API key that goes in the file can be found here: https://ai.google.dev/tutorials/setup")
+            args.api_key_file = None
+        if args.backend == "gemini" and args.model == 'gpt-3.5-turbo-16k-0613':
+             args.model = 'gemini-1.5-flash'
+
+    except (FileNotFoundError, NotADirectoryError) as e:
+        print(f"Error in input validation: {e}")
+        return
+
+    if not os.path.exists(args.output_folder):
+        os.makedirs(args.output_folder)
+    current_run_timestamp = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+    # directly add the timestamp to args
+    args.current_run_timestamp = current_run_timestamp
+    current_run_args_json_filename = 'args-' + current_run_timestamp + '.json'
+    current_run_args_json_path = os.path.join(args.output_folder, current_run_args_json_filename)
+    with open(current_run_args_json_path, 'w') as f:
+        print(f"Saving current run args config to: {current_run_args_json_path}")
+        json.dump(args.__dict__, f)
+
+    args.api_key = None
+    if args.api_key_file:
+        try:
+            with open(args.api_key_file, 'r') as key_file:
+                args.api_key = key_file.read().strip()
+        except FileNotFoundError as e:
+            print(f"Error while loading API key file: {e}")
+            return
+
     return args
+
 
 def load_data(input_folder):
     """
@@ -1034,7 +1151,8 @@ def main():
     3. Process the loaded data according to the parsed arguments and generate outputs using `process_data`.
     """
     # Parse command line arguments to get configuration
-    args = parse_args()
+    parser = parser_setup()
+    args = parse_args_and_config(parser=parser)
 
     # Load and parse data from the input folder specified by args.input_folder
     # load_data only needs the input_folder argument
