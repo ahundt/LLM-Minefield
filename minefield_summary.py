@@ -987,11 +987,15 @@ def parse_args_and_config(args=None, parser=None):
         process_config(args)
 
     try:
-        validate_directory(args.input)
+        validate_directory(args.input_folder)
         # validate_file(args.codebook_path)
 
+        # checi if there is an api_key file arg at all (e.g. not defined by the parser) so not in the object dictionary
+        if not hasattr(args, 'api_key_file'):
+            # if not, set it to None
+            args.api_key_file = None
         # if the api_key_file does not exist, set it to none and print an explanation
-        if not os.path.exists(args.api_key_file):
+        elif not os.path.exists(args.api_key_file):
             print(f"Warning: API key file '{args.api_key_file}' not found. The API key will be set to None, and no real calls will be made to the chat model.")
             print("If you want to make real calls to the chat model, you must provide a valid API key file that contains only the key itself as plain text.")
             if args.backend == "openai":
@@ -999,14 +1003,15 @@ def parse_args_and_config(args=None, parser=None):
             elif args.backend == "gemini":
                 print("Instructions to get the Gemini API key that goes in the file can be found here: https://ai.google.dev/tutorials/setup")
             args.api_key_file = None
-        if args.backend == "gemini" and args.model == 'gpt-3.5-turbo-16k-0613':
+        if hasattr(args, 'backend') and args.backend == "gemini" and args.model == 'gpt-3.5-turbo-16k-0613':
              args.model = 'gemini-1.5-flash'
 
     except (FileNotFoundError, NotADirectoryError) as e:
         print(f"Error in input validation: {e}")
         return
 
-    if not os.path.exists(args.output_folder):
+    if not os.path.exists(args.output_folder) and args.output_folder:
+        # if the output folder does not exist, create it
         os.makedirs(args.output_folder)
     current_run_timestamp = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     # directly add the timestamp to args
@@ -1018,7 +1023,7 @@ def parse_args_and_config(args=None, parser=None):
         json.dump(args.__dict__, f)
 
     args.api_key = None
-    if args.api_key_file:
+    if hasattr(args, 'api_key_file') and args.api_key_file:
         try:
             with open(args.api_key_file, 'r') as key_file:
                 args.api_key = key_file.read().strip()
