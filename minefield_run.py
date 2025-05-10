@@ -98,7 +98,7 @@ def parser_setup(parser=None):
         '--rename_models',
         type=json.loads, # Use json.loads as the type directly
         # default='{}', # Default is empty JSON string, which json.loads parses to {}
-        default='{"qwen3:30b": "Qwen 3 30B Alibaba", "gemma3:27b": "Gemma 3 27B Google", "granite3.3:latest": "Granite 3.3 8B (IBM)", "llama3.3:latest": "LLaMA 3.3 27B (Meta)", "phi4:latest": "Phi 4 14B Microsoft"}',
+        default='{"qwen3:30b": "Qwen 3\\n30B Alibaba", "gemma3:27b": "Gemma 3\\n27B Google", "granite3.3:latest": "Granite 3.3\\n8B IBM", "llama3.3:latest": "LLaMA 3.3\\n27B Meta", "phi4:latest": "Phi 4\\n14B Microsoft"}',
         help='(Passed to minefield_summary.process_data) JSON string for renaming models (e.g., \'{"Bing": "CoPilot"}\').'
     )
 

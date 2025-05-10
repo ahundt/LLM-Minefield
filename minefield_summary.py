@@ -211,9 +211,9 @@ def create_safety_failure_stacked_bar_chart(
     subtitle_font_size: int = 16, # New parameter for subtitle font size
     axis_label_font_size: int = 18, # Parameter for axis label font size (Increased default)
     axis_tick_font_size: int = 14, # Parameter for axis tick label font size (Increased default)
-    model_tick_font_size: int = 14, # New parameter for model tick label font size (Increased default)
-    legend_title_font_size: int = 14, # Parameter for legend title font size (Increased default)
-    legend_font_size: int = 12, # Parameter for legend text font size (Increased default)
+    model_tick_font_size: int = 10, # New parameter for model tick label font size (Increased default)
+    legend_title_font_size: int = 12, # Parameter for legend title font size (Increased default)
+    legend_font_size: int = 10, # Parameter for legend text font size (Increased default)
     annotation_font_size: int = 16, # Parameter for font size of the total annotation text above the bar (Increased default) - Made same as in_bar_font_size
     annotation_font_weight: str = 'bold', # New parameter for bold total annotation text
     in_bar_font_size: int = 16, # Increased font size for text inside bar segments
