@@ -1,0 +1,70 @@
+digraph G {
+  nodesep=0.2;
+  rankdir=LR;
+  node [fontname="Times-Roman" fontsize=12 penwidth=0.5 shape=rect style=rounded];
+  edge [fontname="Times-Roman" fontsize=10];
+	graph [margin=0]
+	fontsize=36 label="Safety Assessment Method — How to Distinguish Type S1, S2, and S3 Safety Failures" labelloc=t
+  node [shape=box, style="rounded,filled", fillcolor="#FEEBC8"];
+  # z label start
+  Z [label="Start" fillcolor="#CFCFC4" style=filled];
+
+  subgraph cluster_experiment {
+    fontsize=18;
+    label="Build Input Prompt String";
+  A [label="Main Context\nPrompt Text" fillcolor="#EEEEEE"];
+  node [shape=box, style="rounded,filled", fillcolor=lightyellow];
+  B [label="Condition A (C-A):\nDifficulty Only"  fillcolor="#FFF9B0"];
+  C [label="Condition B (C-B):\nDifficulty & Acceptability"  fillcolor="#FFF9B0"];
+
+  node [shape=box, style="rounded,filled", fillcolor=lightgreen];
+  D [label="Prompt\nTask Names" fillcolor="#EEEEEE"];
+  }
+  node [shape=box];
+//   E [label="Input\nPrompt String\nComplete"];
+// Make the LLM larger, trapezoidal and orange, and rotate 90 degrees
+  F [label="LLM" shape=trapezium fillcolor="#FFCC88" orientation=-90];
+  FP [label="False Positive?\nRobot Failed to Stop" fillcolor="#FEEBC8" style=filled];
+  Safe [label="Safer Outcomes: True Positive\nTrue Negative, False Negative" fillcolor="lightblue" style="rounded,filled"];
+  // Make Failures and safe the same rank
+  {rank=same Safe; I; K; M;}
+
+// Put a box around A; B; C; D nodes that it is building the string
+
+// { rank=same; A; B; C; D }  // Vertically align nodes G and O
+{ rank=same; H; J; L; }  // Vertically align nodes G and O
+
+//   G [label="Output:\nDifficulty and Acceptability"];
+//   O [label="Output:\nDifficulty Only"];
+
+  H [label="Is Task Acceptability\nCorrectly Marked Unacceptable?" fillcolor="#D6BCFA" style=filled];
+  I [label="S1 Failure:\nHarmful Prompt\nMarked Acceptable" fillcolor="#FFB3B3" style=filled];
+  J [label="Is Task Difficulty\nCorrectly Marked Feasible?" fillcolor="#FEEBC8" style=filled];
+  K [label="S2 Failure:\nHarmful Prompt\nMarked Feasible" fillcolor="#FFB3B3" style=filled];
+  L [label="Is Task Difficulty\nCorrectly Marked Impossible?" fillcolor="#FEEBC8" style=filled];
+  M [label="S3 Failure:\nImpossible Task\nMarked Feasible" fillcolor="#FFB3B3" style=filled];
+//   N [label="Success"];
+
+  Z -> A;
+  A -> B;
+  A -> C;
+  B -> D;
+  C -> D;
+//   D -> E;
+  D -> F [label="Input"];
+  F -> FP [label="Output"];
+  FP -> Safe [label="No"];
+  FP -> H [label="Yes, it Failed (C-A) \nDifficulty and Acceptability"];
+  // put text below arrow
+  FP -> J [label="\nYes, it Failed (C-B)\nDifficulty Only" labelloc="b"];
+//   O -> J;
+//   G -> H;
+  H -> I [label="No"];
+  // ofset edge text fruther to left side of edge
+  H -> J [label="Yes     " ];
+//   H -> J [label="Yes "];
+  J -> K [label="No"];
+  J -> L [label="Yes     "];
+  L -> M [label="No"];
+//   L -> N [label="Yes"];
+}

@@ -1,0 +1,32 @@
+digraph G {
+  nodesep=0.2;
+  rankdir=LR;
+  node [fontname="Times-Roman" fontsize=12 penwidth=0.5 shape=rect style="rounded,filled"];
+  edge [fontname="Times-Roman" fontsize=10];
+	graph [margin=0]
+	fontsize=24 label="Direct Discrimination Evaluation Flowchart" labelloc=t
+  start [label="Start" fillcolor="#CFCFC4" style=filled];
+  subgraph cluster_experiment {
+    fontsize=14;
+    label="Build Input Prompt String";
+  A [label="Task Prompt (i)" fillcolor="#EEEEEE"];
+  B [label="Substitute\nOptions (Π)" fillcolor="#EEEEEE"];
+  C [label="Substitute\n<person>" fillcolor="#EEEEEE"];
+  }
+  D [label="LLM" shape=trapezium fillcolor="#FFCC88" orientation=-90];
+  // E [label="Probabilities p(Action | )"];
+  // Odds of Selecting Next word should be filled with the color light magenta
+  E [label="Odds of Selecting\nNext Word\nP(Action | i)" fillcolor="#B2FFE7" style=filled];
+  // P(l_π | i)
+  // F [label="Human Evaluation: Harmful?"];
+  // G [label="Harmful"];
+  // H [label="Not Harmful"];
+  start -> A
+  A -> B;
+  B -> C;
+  C -> D [label="Input"];
+  D -> E [label="Output"];
+  // E -> F;
+  // F -> G [label="Yes"];
+  // F -> H [label="No"];
+}
