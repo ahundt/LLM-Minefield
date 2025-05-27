@@ -8,6 +8,7 @@ import textwrap
 import re
 import os
 import json
+import sys
 from io import StringIO
 import datetime
 import plotly.express as px
@@ -15,30 +16,80 @@ from plotly import graph_objects as go
 # from matplotlib.colors import ListedColormap
 # from matplotlib.cm import coolwarm
 
-def map_acceptability_to_bool(acceptability):
-    if acceptability:
-        if 'unaccept' in acceptability.lower():
+def map_acceptability_to_bool(acceptability_input):
+    """
+    Maps an input representing task acceptability to a boolean value or NaN.
+
+    Handles strings "acceptable" (True), "unacceptable" (False),
+    existing boolean values, and pandas/numpy NaN types.
+    Prints a warning and returns NaN for unmappable inputs.
+
+    Args:
+        acceptability_input: The input value, typically a string from LLM output,
+                             a boolean, or NaN.
+
+    Returns:
+        bool | np.nan: True if acceptable, False if unacceptable, np.nan if input
+                      is NaN or cannot be clearly mapped.
+    """
+    if pd.isna(acceptability_input):
+        return np.nan  # Preserve NaN
+
+    if isinstance(acceptability_input, str):
+        acceptability_lower = acceptability_input.lower().strip()
+        if 'unaccept' in acceptability_lower or 'not accept' in acceptability_lower:  # Catches "unacceptable", "not acceptable"
             return False
-        else:
+        elif 'accept' in acceptability_lower: # Catches "acceptable"
             return True
-    # return nan if acceptability is not provided
+        else:
+            # String present but doesn't match known acceptability patterns
+            print(f"Warning (map_acceptability_to_bool): Could not map string '{acceptability_input}' to boolean. Returning NaN.")
+            return np.nan
+
+    if isinstance(acceptability_input, (bool, np.bool_)):
+        return bool(acceptability_input) # Ensure it's a Python bool
+
+    # If input is not string, bool, or NaN, it's unexpected, this includes None or other types.
+    print(f"Warning (map_acceptability_to_bool): Received unexpected input type '{type(acceptability_input)}' for value '{acceptability_input}'. Returning NaN.")
     return np.nan
 
-def map_acceptability_to_str(acceptability):
-    # if accessibility is a string
-    if isinstance(acceptability, str):
-        if 'unaccept' in acceptability.lower():
+def map_acceptability_to_str(acceptability_input):
+    """
+    Maps a boolean or string input representing task acceptability to a
+    canonical string ("Acceptable", "Unacceptable") or preserves NaN.
+
+    This is used to standardize the string representation after boolean mapping.
+
+    Args:
+        acceptability_input: The input value, typically a boolean result from
+                             map_acceptability_to_bool, a string, or NaN.
+
+    Returns:
+        str | np.nan: "Acceptable", "Unacceptable", or np.nan.
+    """
+    if pd.isna(acceptability_input):
+        return np.nan # Preserve NaN
+
+    if isinstance(acceptability_input, str):
+        # If it's already a string, try to normalize it to canonical,
+        # otherwise return as is if it's an unknown string.
+        acceptability_lower = acceptability_input.lower().strip()
+        if 'unaccept' in acceptability_lower or 'not accept' in acceptability_lower:
             return 'Unacceptable'
-        else:
+        elif 'accept' in acceptability_lower:
             return 'Acceptable'
-    # nan and none stays as is
-    elif pd.isna(acceptability) or acceptability is None:
-        return acceptability
-    # elif acceptability is convertible to a boolean
-    elif acceptability:
-        return 'Acceptable'
-    else:
-        return 'Unacceptable'
+        else:
+            # If it's a string but not clearly 'acceptable' or 'unacceptable'
+            # this could be an issue. For now, return it, but ideally, inputs are bool/NaN.
+            print(f"Warning (map_acceptability_to_str): Received non-canonical string '{acceptability_input}'. Returning as is. Check the data and update the code to process it.")
+            return acceptability_input
+
+    if isinstance(acceptability_input, (bool, np.bool_)):
+        return 'Acceptable' if bool(acceptability_input) else 'Unacceptable'
+
+    # If input is not string, bool, or NaN.
+    print(f"Warning (map_acceptability_to_str): Received unexpected input type '{type(acceptability_input)}' for value '{acceptability_input}'. Returning as is.")
+    return acceptability_input
 
 def map_difficulty(difficulty):
     # if difficulty is not a string return nan
@@ -1005,7 +1056,7 @@ def visualize_data(data, output_folder='results'):
     false_positive_count.to_csv(os.path.join(output_folder, 'Harmful_Tasks_Marked_Acceptable_False_Positive_Count.csv'))
 
     ############################################################
-    # Task Difficulty by Task C-A
+    # Task Difficulty by Task C-A aka S2 Failures
 
     # filter to include rows where the acceptable column is empty
     difficulty_data = data[data['Acceptable'].isna()]
@@ -1028,7 +1079,7 @@ def visualize_data(data, output_folder='results'):
 
 
     ############################################################
-    # Impossible tasks marked feasible C-A + C-B
+    # Impossible tasks marked feasible C-A + C-B AKA S3 Failures
     # Get the list of impossible tasks
     impossible_tasks = get_impossible_tasks()
 
@@ -1473,8 +1524,5 @@ def main():
         rename_models=args.rename_models
     )
 
-
 if __name__ == "__main__":
-    # This block is the standard entry point when the script is executed directly.
-    # It simply calls the main orchestration function to start the workflow.
     main()
